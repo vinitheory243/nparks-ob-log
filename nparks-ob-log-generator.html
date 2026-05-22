@@ -1011,81 +1011,24 @@ Return ONLY the JSON object.`;
     return `${slot.slice(0,2)}${slot.slice(2)} hrs`;
   }
 
-  async function resizeForDoc(file, displayW = 285, displayH = 214) {
-    // Word does NOT apply EXIF orientation — we must bake rotation into the pixel data.
-    let orientation = 1;
-    try {
-      if (window.exifr) {
-        const d = await window.exifr.parse(file, ['Orientation']);
-        orientation = d?.Orientation || 1;
-      }
-    } catch(e) {}
-
+  async function resizeForDoc(file) {
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
-
-      img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH }); };
-
+      img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 }); };
       img.onload = () => {
         URL.revokeObjectURL(url);
-        try {
-          const imgW = img.naturalWidth;
-          const imgH = img.naturalHeight;
-          const swapped = orientation >= 5; // 5-8 are 90°/270° rotations
-
-          // Some browsers auto-correct EXIF in naturalWidth/Height (Chrome 81+).
-          // Detect: if swapped but image already appears portrait, browser corrected it.
-          const browserCorrected = swapped && imgW < imgH;
-
-          // Raw pixel dimensions (before any EXIF correction)
-          const rawW = browserCorrected ? imgH : imgW;
-          const rawH = browserCorrected ? imgW : imgH;
-
-          // Correct display dimensions after applying orientation
-          const natW = swapped ? rawH : rawW;
-          const natH = swapped ? rawW : rawH;
-
-          // Canvas size: max 900px on longest side (portrait-correct dims)
-          const cRatio = Math.min(900 / natW, 900 / natH, 1);
-          const cw = Math.max(1, Math.round(natW * cRatio));
-          const ch = Math.max(1, Math.round(natH * cRatio));
-
-          // Docx display size (fits within displayW × displayH)
-          const dRatio = Math.min(displayW / natW, displayH / natH, 1);
-          const dispW  = Math.max(1, Math.round(natW * dRatio));
-          const dispH  = Math.max(1, Math.round(natH * dRatio));
-
-          const canvas = document.createElement('canvas');
-          canvas.width  = cw;
-          canvas.height = ch;
-          const ctx = canvas.getContext('2d');
-
-          if (browserCorrected) {
-            // Browser already drew correctly-oriented pixels — just scale
-            ctx.drawImage(img, 0, 0, cw, ch);
-          } else {
-            // Manually bake EXIF rotation into canvas pixels
-            ctx.save();
-            ctx.translate(cw / 2, ch / 2);
-            const a = { 3: Math.PI, 6: Math.PI / 2, 8: -Math.PI / 2 }[orientation] || 0;
-            if (a) ctx.rotate(a);
-            // swapped: raw image has landscape dims (rawW × rawH), draw transposed
-            if (swapped) ctx.drawImage(img, -ch / 2, -cw / 2, ch, cw);
-            else         ctx.drawImage(img, -cw / 2, -ch / 2, cw, ch);
-            ctx.restore();
-          }
-
-          // toDataURL is synchronous — no async callback issues on any browser
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-          const b64     = dataUrl.split(',')[1];
-          const bytes   = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-          resolve({ buf: bytes.buffer, w: dispW, h: dispH });
-        } catch(e) {
-          resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
-        }
+        const ratio = Math.min(0.5, 285 / img.naturalWidth, 214 / img.naturalHeight);
+        const w = Math.max(1, Math.round(img.naturalWidth  * ratio));
+        const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const b64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        resolve({ buf: bytes.buffer, w, h });
       };
-
       img.src = url;
     });
   }
@@ -1667,7 +1610,7 @@ Format: section1|||section2|||section3|||section4`;
         // Embed observation photos (2 per row) above the notes text
         for (let i = 0; i < dPhotos.length; i += 2) {
           const pair    = dPhotos.slice(i, i + 2);
-          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file, 230, 173)));
+          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
           const imgCells = resized.map(r => new D.TableCell({
             children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
             borders:  { top: noB, bottom: noB, left: noB, right: noB },
