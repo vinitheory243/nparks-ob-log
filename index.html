@@ -806,6 +806,10 @@
 </div>
 
 <script>
+  window.onerror = (msg, src, line, col, err) => {
+    document.body.style.cssText = 'background:#fff;padding:20px;font-family:monospace;color:red;';
+    document.body.innerHTML = '<h2>JS Error</h2><pre>' + msg + '\n\n' + (err?.stack || '') + '\n\nLine ' + line + ':' + col + '\n' + src + '</pre>';
+  };
   // ── fast game ──────────────────────────────────────────────────────────────
   function openFastGame() {
     document.getElementById('fastGameOverlay').classList.add('open');
@@ -1042,8 +1046,12 @@ Return ONLY the JSON object.`;
   }
 
   function readStr(buf, offset, len) {
-    try { return String.fromCharCode(...new Uint8Array(buf, offset, len)).replace(/\0.*/, ''); }
-    catch (_) { return ''; }
+    try {
+      const bytes = new Uint8Array(buf, offset, len);
+      let s = '';
+      for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+      return s.replace(/\0.*/, '');
+    } catch (_) { return ''; }
   }
 
   async function getPhotoTimestamp(file) {
