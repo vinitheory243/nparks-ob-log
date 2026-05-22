@@ -1012,40 +1012,71 @@ Return ONLY the JSON object.`;
   }
 
   async function resizeForDoc(file, displayW = 285, displayH = 214) {
+    // Word does NOT apply EXIF orientation — we must bake rotation into the pixel data.
+    let orientation = 1;
+    try {
+      if (window.exifr) {
+        const d = await window.exifr.parse(file, ['Orientation']);
+        orientation = d?.Orientation || 1;
+      }
+    } catch(e) {}
+
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
 
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
-      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH }); };
 
       img.onload = () => {
         URL.revokeObjectURL(url);
         try {
-          // All modern browsers (iOS Safari 12+, Chrome 89+) auto-apply EXIF orientation,
-          // so naturalWidth/Height are already the correct display dimensions — no manual rotation needed.
-          const natW = img.naturalWidth;
-          const natH = img.naturalHeight;
+          const imgW = img.naturalWidth;
+          const imgH = img.naturalHeight;
+          const swapped = orientation >= 5; // 5-8 are 90°/270° rotations
 
-          // Resize to max 900px on longest side for file-size efficiency
-          const canvasRatio = Math.min(900 / natW, 900 / natH, 1);
-          const cw = Math.max(1, Math.round(natW * canvasRatio));
-          const ch = Math.max(1, Math.round(natH * canvasRatio));
+          // Some browsers auto-correct EXIF in naturalWidth/Height (Chrome 81+).
+          // Detect: if swapped but image already appears portrait, browser corrected it.
+          const browserCorrected = swapped && imgW < imgH;
 
-          // Docx display dimensions (maintains aspect ratio within displayW × displayH)
-          const dispRatio = Math.min(displayW / natW, displayH / natH, 1);
-          const dispW = Math.max(1, Math.round(natW * dispRatio));
-          const dispH = Math.max(1, Math.round(natH * dispRatio));
+          // Raw pixel dimensions (before any EXIF correction)
+          const rawW = browserCorrected ? imgH : imgW;
+          const rawH = browserCorrected ? imgW : imgH;
+
+          // Correct display dimensions after applying orientation
+          const natW = swapped ? rawH : rawW;
+          const natH = swapped ? rawW : rawH;
+
+          // Canvas size: max 900px on longest side (portrait-correct dims)
+          const cRatio = Math.min(900 / natW, 900 / natH, 1);
+          const cw = Math.max(1, Math.round(natW * cRatio));
+          const ch = Math.max(1, Math.round(natH * cRatio));
+
+          // Docx display size (fits within displayW × displayH)
+          const dRatio = Math.min(displayW / natW, displayH / natH, 1);
+          const dispW  = Math.max(1, Math.round(natW * dRatio));
+          const dispH  = Math.max(1, Math.round(natH * dRatio));
 
           const canvas = document.createElement('canvas');
           canvas.width  = cw;
           canvas.height = ch;
-          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          const ctx = canvas.getContext('2d');
 
-          // toDataURL is synchronous — avoids canvas.toBlob/FileReader/blob.arrayBuffer
-          // compatibility issues that caused 200+ MB files on older iOS Safari.
+          if (browserCorrected) {
+            // Browser already drew correctly-oriented pixels — just scale
+            ctx.drawImage(img, 0, 0, cw, ch);
+          } else {
+            // Manually bake EXIF rotation into canvas pixels
+            ctx.save();
+            ctx.translate(cw / 2, ch / 2);
+            const a = { 3: Math.PI, 6: Math.PI / 2, 8: -Math.PI / 2 }[orientation] || 0;
+            if (a) ctx.rotate(a);
+            // swapped: raw image has landscape dims (rawW × rawH), draw transposed
+            if (swapped) ctx.drawImage(img, -ch / 2, -cw / 2, ch, cw);
+            else         ctx.drawImage(img, -cw / 2, -ch / 2, cw, ch);
+            ctx.restore();
+          }
+
+          // toDataURL is synchronous — no async callback issues on any browser
           const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
           const b64     = dataUrl.split(',')[1];
           const bytes   = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
