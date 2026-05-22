@@ -1063,9 +1063,11 @@ Return ONLY the JSON object.`;
 
           canvas.toBlob(blob => {
             if (!blob) { resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH }); return; }
-            blob.arrayBuffer()
-              .then(buf => resolve({ buf, w: dispW, h: dispH }))
-              .catch(()  => resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH }));
+            // Use FileReader — works on all iOS Safari versions (blob.arrayBuffer() is iOS 14.1+ only)
+            const reader = new FileReader();
+            reader.onload  = () => resolve({ buf: reader.result, w: dispW, h: dispH });
+            reader.onerror = () => resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH });
+            reader.readAsArrayBuffer(blob);
           }, 'image/jpeg', 0.75);
         } catch(e) {
           resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
