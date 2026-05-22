@@ -253,6 +253,40 @@
       .prev-thumb img { width: 90px; height: 67px; }
     }
 
+    /* ── Per-day photo upload ───────────────────────────────────────────────── */
+    .day-photo-wrap { margin-top: 10px; }
+    .btn-day-photo {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: #f0f8f2;
+      color: #1a5c2a;
+      border: 1.5px solid #a8d8b2;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-day-photo:active { background: #e0f0e5; }
+    .day-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .day-thumb  { position: relative; }
+    .day-thumb img {
+      width: 72px; height: 54px; object-fit: cover;
+      border-radius: 5px; border: 1.5px solid #ddd;
+    }
+    .day-thumb-remove {
+      position: absolute; top: -5px; right: -5px;
+      width: 18px; height: 18px;
+      background: #e74c3c; color: #fff;
+      border: 2px solid #fff; border-radius: 50%;
+      font-size: 12px; font-weight: 700; line-height: 1;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; padding: 0; z-index: 2;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     /* ── AI generate button ─────────────────────────────────────────────────── */
     .btn-ai {
       display: inline-flex;
@@ -473,6 +507,11 @@
         </label>
         <textarea id="day1Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
       </div>
+      <div class="day-photo-wrap">
+        <label class="btn-day-photo" for="day1ObsPhotos">📷 Add Photos to Observation</label>
+        <input type="file" id="day1ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(1, this.files)" />
+        <div id="day1PhotoThumbs" class="day-thumbs"></div>
+      </div>
     </div>
 
     <hr class="divider" />
@@ -512,6 +551,11 @@
         </label>
         <textarea id="day2Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
       </div>
+      <div class="day-photo-wrap">
+        <label class="btn-day-photo" for="day2ObsPhotos">📷 Add Photos to Observation</label>
+        <input type="file" id="day2ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(2, this.files)" />
+        <div id="day2PhotoThumbs" class="day-thumbs"></div>
+      </div>
     </div>
 
     <hr class="divider" />
@@ -550,6 +594,11 @@
           <button class="btn-ai" onclick="generateDayNotes(3, this)">✦ Generate</button>
         </label>
         <textarea id="day3Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
+      </div>
+      <div class="day-photo-wrap">
+        <label class="btn-day-photo" for="day3ObsPhotos">📷 Add Photos to Observation</label>
+        <input type="file" id="day3ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(3, this.files)" />
+        <div id="day3PhotoThumbs" class="day-thumbs"></div>
       </div>
     </div>
   </div>
@@ -669,6 +718,33 @@
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
     return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+  }
+
+  // ── Per-day observation photos ─────────────────────────────────────────────
+  let survDayPhotos = { 1: [], 2: [], 3: [] };
+
+  async function handleDayPhoto(day, files) {
+    survDayPhotos[day].forEach(p => URL.revokeObjectURL(p.thumbUrl));
+    survDayPhotos[day] = Array.from(files).map(file => ({
+      file,
+      thumbUrl: URL.createObjectURL(file),
+    }));
+    renderDayThumbs(day);
+  }
+
+  function renderDayThumbs(day) {
+    const container = document.getElementById(`day${day}PhotoThumbs`);
+    container.innerHTML = survDayPhotos[day].map((p, i) => `
+      <div class="day-thumb">
+        <button class="day-thumb-remove" onclick="removeDayPhoto(${day},${i})">×</button>
+        <img src="${p.thumbUrl}" loading="lazy" />
+      </div>`).join('');
+  }
+
+  function removeDayPhoto(day, idx) {
+    URL.revokeObjectURL(survDayPhotos[day][idx].thumbUrl);
+    survDayPhotos[day].splice(idx, 1);
+    renderDayThumbs(day);
   }
 
   // ── Photo processing ───────────────────────────────────────────────────────
@@ -936,13 +1012,21 @@ Format: section1|||section2|||section3|||section4`;
 
     const toHtml = t => (t || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
-    const survObsRows = days.map((d, i) => `
+    const survObsRows = days.map((d, i) => {
+      const dPhotos = survDayPhotos[d.idx] || [];
+      const photoHtml = dPhotos.length > 0
+        ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">${
+            dPhotos.map(p => `<img src="${p.thumbUrl}" style="max-width:210px;max-height:160px;object-fit:contain;border:1px solid #ddd;border-radius:3px;">`).join('')
+          }</div>`
+        : '';
+      return `
       <tr>
         <td style="width:25%;vertical-align:top;">
           <strong>Day ${i + 1}</strong><br><strong>${d.date}</strong><br>${fmtTime(d.start)}–${fmtTime(d.end)}
         </td>
-        <td style="width:75%;vertical-align:top;">${toHtml(d.notes)}</td>
-      </tr>`).join('');
+        <td style="width:75%;vertical-align:top;">${photoHtml}${toHtml(d.notes)}</td>
+      </tr>`;
+    }).join('');
 
     const sightingsCells = days.map(d =>
       `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows</p>`
@@ -1252,7 +1336,34 @@ Format: section1|||section2|||section3|||section4`;
           tableHeader: true,
         }),
       ];
-      days.forEach((d, idx) => {
+      const noB = { style: D.BorderStyle.NONE, size: 0, color: 'auto' };
+      for (let idx = 0; idx < days.length; idx++) {
+        const d = days[idx];
+        const dPhotos = survDayPhotos[d.idx] || [];
+        const rightCellChildren = [];
+
+        // Embed observation photos (2 per row) above the notes text
+        for (let i = 0; i < dPhotos.length; i += 2) {
+          const pair    = dPhotos.slice(i, i + 2);
+          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file, 230, 173)));
+          const imgCells = resized.map(r => new D.TableCell({
+            children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
+            borders:  { top: noB, bottom: noB, left: noB, right: noB },
+            margins:  { top: 40, bottom: 40, left: 0, right: 60 },
+          }));
+          if (imgCells.length === 1) imgCells.push(new D.TableCell({ children: [emptyPara()], borders: { top: noB, bottom: noB, left: noB, right: noB } }));
+          rightCellChildren.push(new D.Table({
+            width:   { size: 100, type: D.WidthType.PERCENTAGE },
+            rows:    [new D.TableRow({ children: imgCells })],
+            borders: { top: noB, bottom: noB, left: noB, right: noB, insideH: noB, insideV: noB },
+          }));
+          rightCellChildren.push(emptyPara());
+        }
+
+        // Observation notes text
+        (d.notes ? textToParas(d.notes) : [new D.Paragraph({ children: [TR({ text: '' })], spacing: sp0 })])
+          .forEach(p => rightCellChildren.push(p));
+
         survRows.push(new D.TableRow({
           children: [
             new D.TableCell({
@@ -1264,14 +1375,14 @@ Format: section1|||section2|||section3|||section4`;
               width:   { size: 25, type: D.WidthType.PERCENTAGE },
               margins: { top: 80, bottom: 80, left: 120, right: 120 },
             }),
-            cCell(d.notes
-              ? textToParas(d.notes)
-              : [new D.Paragraph({ children: [TR({ text: '' })], spacing: sp0 })],
-              75
-            ),
+            new D.TableCell({
+              children: rightCellChildren,
+              width:    { size: 75, type: D.WidthType.PERCENTAGE },
+              margins:  { top: 80, bottom: 80, left: 120, right: 120 },
+            }),
           ],
         }));
-      });
+      }
 
       const survTable = new D.Table({
         width: { size: 100, type: D.WidthType.PERCENTAGE },
