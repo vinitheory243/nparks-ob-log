@@ -1018,14 +1018,19 @@ Return ONLY the JSON object.`;
       img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 }); };
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const ratio = Math.min(0.5, 285 / img.naturalWidth, 214 / img.naturalHeight);
-        const w = Math.max(1, Math.round(img.naturalWidth  * ratio));
-        const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+        // Canvas: scale to max 1200px on longest side (high resolution for clarity)
+        const cRatio = Math.min(1200 / img.naturalWidth, 1200 / img.naturalHeight, 1);
+        const cw = Math.max(1, Math.round(img.naturalWidth  * cRatio));
+        const ch = Math.max(1, Math.round(img.naturalHeight * cRatio));
         const canvas = document.createElement('canvas');
-        canvas.width  = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const b64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+        canvas.width  = cw;
+        canvas.height = ch;
+        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+        // Display size in docx: fit within 285×214
+        const dRatio = Math.min(285 / img.naturalWidth, 214 / img.naturalHeight, 1);
+        const w = Math.max(1, Math.round(img.naturalWidth  * dRatio));
+        const h = Math.max(1, Math.round(img.naturalHeight * dRatio));
+        const b64   = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
         const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
         resolve({ buf: bytes.buffer, w, h });
       };
