@@ -1012,15 +1012,6 @@ Return ONLY the JSON object.`;
   }
 
   async function resizeForDoc(file, displayW = 285, displayH = 214) {
-    // Get EXIF orientation (lite build supports JPEG)
-    let orientation = 1;
-    try {
-      if (window.exifr) {
-        const d = await window.exifr.parse(file, ['Orientation']);
-        if (d?.Orientation) orientation = d.Orientation;
-      }
-    } catch(e) {}
-
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
@@ -1033,42 +1024,32 @@ Return ONLY the JSON object.`;
       img.onload = () => {
         URL.revokeObjectURL(url);
         try {
-          // Orientations 5-8 rotate 90°/270° — swap width/height
-          const swapped = orientation >= 5;
-          const natW = swapped ? img.naturalHeight : img.naturalWidth;
-          const natH = swapped ? img.naturalWidth  : img.naturalHeight;
+          // All modern browsers (iOS Safari 12+, Chrome 89+) auto-apply EXIF orientation,
+          // so naturalWidth/Height are already the correct display dimensions — no manual rotation needed.
+          const natW = img.naturalWidth;
+          const natH = img.naturalHeight;
 
-          // Display dimensions in docx (maintains aspect ratio)
-          const dispRatio = Math.min(displayW / natW, displayH / natH, 1);
-          const dispW = Math.max(1, Math.round(natW * dispRatio));
-          const dispH = Math.max(1, Math.round(natH * dispRatio));
-
-          // Canvas at max 900px on longest side — good quality, manageable size
+          // Resize to max 900px on longest side for file-size efficiency
           const canvasRatio = Math.min(900 / natW, 900 / natH, 1);
           const cw = Math.max(1, Math.round(natW * canvasRatio));
           const ch = Math.max(1, Math.round(natH * canvasRatio));
 
+          // Docx display dimensions (maintains aspect ratio within displayW × displayH)
+          const dispRatio = Math.min(displayW / natW, displayH / natH, 1);
+          const dispW = Math.max(1, Math.round(natW * dispRatio));
+          const dispH = Math.max(1, Math.round(natH * dispRatio));
+
           const canvas = document.createElement('canvas');
           canvas.width  = cw;
           canvas.height = ch;
-          const ctx = canvas.getContext('2d');
-          ctx.save();
-          ctx.translate(cw / 2, ch / 2);
-          const angle = { 3: Math.PI, 6: Math.PI / 2, 8: -Math.PI / 2 }[orientation] || 0;
-          if (angle) ctx.rotate(angle);
-          // For swapped orientations, raw image axes are transposed
-          if (swapped) ctx.drawImage(img, -ch / 2, -cw / 2, ch, cw);
-          else         ctx.drawImage(img, -cw / 2, -ch / 2, cw, ch);
-          ctx.restore();
+          canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
 
-          canvas.toBlob(blob => {
-            if (!blob) { resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH }); return; }
-            // Use FileReader — works on all iOS Safari versions (blob.arrayBuffer() is iOS 14.1+ only)
-            const reader = new FileReader();
-            reader.onload  = () => resolve({ buf: reader.result, w: dispW, h: dispH });
-            reader.onerror = () => resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH });
-            reader.readAsArrayBuffer(blob);
-          }, 'image/jpeg', 0.75);
+          // toDataURL is synchronous — avoids canvas.toBlob/FileReader/blob.arrayBuffer
+          // compatibility issues that caused 200+ MB files on older iOS Safari.
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          const b64     = dataUrl.split(',')[1];
+          const bytes   = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+          resolve({ buf: bytes.buffer, w: dispW, h: dispH });
         } catch(e) {
           resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
         }
