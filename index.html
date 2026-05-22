@@ -377,11 +377,16 @@
     <div class="grid g2">
       <div class="form-group">
         <label>Officer Name</label>
-        <input type="text" id="officerName" placeholder="e.g. Vinith Kumar Sabah Selvam" />
+        <select id="officerName" onchange="fillOfficerHP()">
+          <option value="">Select officer…</option>
+          <option value="Vinith Kumar">Vinith Kumar</option>
+          <option value="Bhavana Krishna">Bhavana Krishna</option>
+        </select>
       </div>
       <div class="form-group">
         <label>HP Number</label>
-        <input type="text" id="officerHP" placeholder="e.g. 81198326" />
+        <input type="text" id="officerHP" placeholder="Auto-filled" readonly
+          style="background:#f5f5f5;color:#555;" />
       </div>
     </div>
   </div>
@@ -570,6 +575,16 @@
 </div>
 
 <script>
+  // ── officer lookup ─────────────────────────────────────────────────────────
+  const OFFICERS = {
+    'Vinith Kumar':   '81198326',
+    'Bhavana Krishna': '83636240',
+  };
+  function fillOfficerHP() {
+    const name = document.getElementById('officerName').value;
+    document.getElementById('officerHP').value = OFFICERS[name] || '';
+  }
+
   // ── helpers ────────────────────────────────────────────────────────────────
   function val(id) { return document.getElementById(id).value.trim(); }
   function raw(id) { return document.getElementById(id).value; }
