@@ -1026,8 +1026,8 @@ Return ONLY the JSON object.`;
         canvas.width  = cw;
         canvas.height = ch;
         canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        // Display size in docx: fit within 285×214
-        const dRatio = Math.min(285 / img.naturalWidth, 214 / img.naturalHeight, 1);
+        // Display size in docx: fit within 570×428
+        const dRatio = Math.min(570 / img.naturalWidth, 428 / img.naturalHeight, 1);
         const w = Math.max(1, Math.round(img.naturalWidth  * dRatio));
         const h = Math.max(1, Math.round(img.naturalHeight * dRatio));
         const b64   = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
