@@ -806,7 +806,7 @@
     const mynas    = document.getElementById(`day${day}Mynas`).value   || '0';
     const crows    = document.getElementById(`day${day}Crows`).value   || '0';
 
-    const system = `You are an NParks Singapore field surveillance officer writing official observation notes for a government Occurrence Book report. Write in formal, factual, third-person language. 3–5 sentences. No bullet points, no headers, no markdown.`;
+    const system = `You are an NParks Singapore field surveillance officer writing official observation notes for a government Occurrence Book report. Output plain text only — absolutely no titles, no headers, no bold, no asterisks, no markdown of any kind. Start directly with the observation content. 3–5 sentences.`;
 
     const prompt = `Write observation notes for this bird surveillance shift:
 Location: ${location}
@@ -845,7 +845,7 @@ Describe what was observed — bird behaviour, perching locations, foraging acti
       `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows`
     ).join('\n');
 
-    const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Write in formal, factual prose. No bullet points, no headers, no markdown. Each section is 2–4 sentences.`;
+    const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — absolutely no titles, no headers, no bold, no asterisks, no markdown of any kind. Each section starts directly with content. 2–4 sentences per section.`;
 
     const prompt = `Based on this bird surveillance at ${location}, write 4 separate sections. Return them separated by the exact delimiter "|||" with no extra text before or after each section.
 
