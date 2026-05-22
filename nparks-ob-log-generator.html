@@ -344,6 +344,21 @@
     }
     .btn-back:active { background: #e8f5ec; }
     @media (min-width: 600px) { .btn-back:hover { background: #e8f5ec; } }
+    .btn-preview {
+      padding: 15px 18px;
+      background: #fff;
+      color: #1a5c2a;
+      border: 2px solid #1a5c2a;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-preview:active { background: #e8f5ec; }
+    @media (min-width: 600px) { .btn-preview:hover { background: #e8f5ec; } }
   </style>
 </head>
 <body>
@@ -605,7 +620,8 @@
   <div id="step2Buttons" style="display:none">
     <div class="btn-row">
       <button class="btn-back" onclick="goStep1()">← Back</button>
-      <button class="btn-generate" id="generateBtn" onclick="generateDoc()">Generate .docx Report</button>
+      <button class="btn-preview" onclick="previewReport()">Preview</button>
+      <button class="btn-generate" id="generateBtn" onclick="generateDoc()">Generate .docx</button>
     </div>
   </div>
 </div>
@@ -874,6 +890,149 @@ Format: section1|||section2|||section3|||section4`;
     } catch (err) {
       alert('AI generation failed: ' + err.message);
     }
+  }
+
+  // ── report preview ─────────────────────────────────────────────────────────
+  function previewReport() {
+    if (!val('caseId'))   { alert('Please enter a Case ID first.');             return; }
+    if (!val('day1Date')) { alert('Please fill in at least Day 1 date first.'); return; }
+
+    const caseId            = val('caseId');
+    const location          = val('location');
+    const activationType    = document.getElementById('activationType').value;
+    const activatingOfficer = val('activatingOfficer');
+    const activationDateRaw = val('activationDate');
+    const officerName       = val('officerName');
+    const officerHP         = val('officerHP');
+    const animalBehaviour   = raw('animalBehaviour');
+    const possibleHabitats  = raw('possibleHabitats');
+    const foodSources       = raw('foodSources');
+    const environment       = raw('environment');
+
+    const days = [];
+    for (let i = 1; i <= 3; i++) {
+      const dateRaw = document.getElementById(`day${i}Date`).value;
+      if (!dateRaw) continue;
+      days.push({
+        idx:     i,
+        date:    fmtDate(dateRaw),
+        dateRaw,
+        start:   document.getElementById(`day${i}Start`).value,
+        end:     document.getElementById(`day${i}End`).value,
+        pigeons: document.getElementById(`day${i}Pigeons`).value || '0',
+        mynas:   document.getElementById(`day${i}Mynas`).value   || '0',
+        crows:   document.getElementById(`day${i}Crows`).value   || '0',
+        notes:   document.getElementById(`day${i}Notes`).value,
+      });
+    }
+
+    const dayNums   = days.map(d => new Date(d.dateRaw + 'T00:00:00').getDate()).join(',');
+    const firstDt   = new Date(days[0].dateRaw + 'T00:00:00');
+    const monthYear = `${MONTHS[firstDt.getMonth()]} ${firstDt.getFullYear()}`;
+    const totalHrs  = days.reduce((s, d) => s + calcHours(d.start, d.end), 0);
+    const timeRange = `${fmtTime(days[0].start)} – ${fmtTime(days[0].end)}`;
+    const survDates = `${dayNums} ${monthYear} (${totalHrs} hours) | ${timeRange}`;
+    const today     = fmtDate(new Date().toISOString().split('T')[0]);
+
+    const toHtml = t => (t || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
+
+    const survObsRows = days.map((d, i) => `
+      <tr>
+        <td style="width:25%;vertical-align:top;">
+          <strong>Day ${i + 1}</strong><br><strong>${d.date}</strong><br>${fmtTime(d.start)}–${fmtTime(d.end)}
+        </td>
+        <td style="width:75%;vertical-align:top;">${toHtml(d.notes)}</td>
+      </tr>`).join('');
+
+    const sightingsCells = days.map(d =>
+      `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows</p>`
+    ).join('<br>');
+
+    const photoNote = processedPhotos.length > 0
+      ? `<p style="color:#1a5c2a;font-style:italic;margin-top:8pt;">${processedPhotos.length} photo(s) will be embedded in the .docx file.</p>`
+      : `<p style="color:#888;font-style:italic;margin-top:8pt;">No photos selected.</p>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Preview – OB LOG FOR ${caseId}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Arial,sans-serif;font-size:11pt;background:#ccc;}
+  .toolbar{background:#1a5c2a;color:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .toolbar span{font-size:14px;font-weight:700;}
+  .toolbar button{background:#fff;color:#1a5c2a;border:none;padding:8px 18px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;}
+  .page{width:210mm;min-height:297mm;margin:20px auto;padding:20mm 19mm;background:#fff;box-shadow:0 4px 24px rgba(0,0,0,0.18);}
+  h1{font-size:14pt;text-align:center;font-weight:bold;margin-bottom:3pt;}
+  h2{font-size:12pt;text-align:center;font-weight:bold;margin-bottom:18pt;}
+  p{font-size:11pt;margin:2pt 0;line-height:1.4;}
+  .sh{font-size:12pt;font-weight:bold;margin:14pt 0 5pt;}
+  table{width:100%;border-collapse:collapse;margin-bottom:12pt;}
+  th{background:#00B050;color:#fff;font-size:11pt;padding:6pt 8pt;text-align:left;border:1px solid #00B050;}
+  td{font-size:11pt;padding:6pt 8pt;border:1px solid #bbb;vertical-align:top;}
+  .sig{text-align:right;margin-top:36pt;}
+  @media print{
+    body{background:#fff;}
+    .toolbar{display:none;}
+    .page{margin:0;padding:20mm 19mm;box-shadow:none;width:100%;}
+    @page{size:A4;margin:0;}
+  }
+</style></head><body>
+<div class="toolbar">
+  <span>Preview – OB LOG FOR ${caseId}</span>
+  <button onclick="window.print()">🖨 Save as PDF (Ctrl+P)</button>
+</div>
+<div class="page">
+  <h1>OB LOG FOR ${caseId}</h1>
+  <h2>${location}</h2>
+  <p><strong>Type of Activation:</strong> ${activationType}</p>
+  <p><strong>Activating Officer:</strong> ${activatingOfficer}</p>
+  <p><strong>Activation Date:</strong> ${fmtDate(activationDateRaw)}</p>
+  <p><strong>Location:</strong> ${location}</p>
+  <p><strong>Surveillance Dates:</strong> ${survDates}</p>
+  <p style="margin-bottom:14pt;"><strong>Surveillance Officer:</strong> ${officerName}${officerHP ? ` | HP: ${officerHP}` : ''}</p>
+
+  <p class="sh">DETAILS OF SURVEILLANCE</p>
+  <p><strong><u>Monitor presence of bird feeding, bird population, or leaving of food</u></strong></p>
+  <p><u>Pigeon surveillance</u></p>
+  <p>1) To carry out surveillance for bird feeding.</p>
+  <p>2) To inform feeder that feeding any forms of wildlife is an offence and highlight that they can be fined up to $10,000.</p>
+  <p>3) Count no. of different bird species sighted and number of birds of each species sighted.</p>
+  <p style="margin-bottom:14pt;">4) Distribute pamphlets to feeder and members of public encountered during surveillance.</p>
+
+  <p class="sh">SUMMARY OF OBSERVATIONS</p>
+  <table>
+    <tr><th style="width:30%">Description</th><th style="width:70%">Observations</th></tr>
+    <tr><td><strong>The maximum number and description of animals sighted:</strong></td><td>${sightingsCells}</td></tr>
+    <tr><td><strong>Animal behaviour displayed:</strong></td><td>${toHtml(animalBehaviour)}</td></tr>
+    <tr><td><strong>Possible habitats of the animals:</strong></td><td>${toHtml(possibleHabitats)}</td></tr>
+    <tr><td><strong>Availability of food sources, including any evidence of feeding or littering:</strong></td><td>${toHtml(foodSources)}</td></tr>
+    <tr><td><strong>The environment, including buildings, trees and terrain:</strong></td><td><p>${location}. ${environment}</p></td></tr>
+    <tr><td><strong>Behaviours of pet owners and pets, including but not limited to allowing pets to be unleashed or defecate in public, barking or smell.</strong></td><td>Nil</td></tr>
+    <tr><td><strong>Any interaction with the feedback provider, members of the public and/or other agencies</strong></td><td>Nil</td></tr>
+  </table>
+
+  <p class="sh">SURVEILLANCE OBSERVATIONS – DATE / TIME</p>
+  <table>
+    <tr><th style="width:25%">Day / Time</th><th style="width:75%">Observation Details</th></tr>
+    ${survObsRows}
+  </table>
+
+  <p class="sh">ATTACHMENTS</p>
+  <p>Photos and screenshots of videos taken minimally at 15-minute intervals.</p>
+  <p>Photographs/video (via email/phone) with date and time stamps, submitted herewith as proof of above surveillance and observations, in chronological order.</p>
+  ${photoNote}
+
+  <div class="sig">
+    <p>${officerName ? `${officerName} (Oneberry)` : 'Officer Name (Oneberry)'}</p>
+    <p>............................................................</p>
+    <p>Name of Officer and Company</p>
+    <p><strong>Date: ${today}</strong></p>
+  </div>
+</div>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
   }
 
   // ── step navigation ────────────────────────────────────────────────────────
