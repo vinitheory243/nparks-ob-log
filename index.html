@@ -992,6 +992,7 @@ Return ONLY the JSON object.`;
   let processedPhotos = [];
 
   async function getPhotoTimestamp(file) {
+    // 1. Try EXIF
     try {
       if (window.exifr) {
         const d = await window.exifr.parse(file);
@@ -999,6 +1000,10 @@ Return ONLY the JSON object.`;
         if (dt) return dt instanceof Date ? dt : new Date(dt);
       }
     } catch(e) { console.warn('exifr parse error:', e); }
+    // 2. Try filename pattern: IMG_20260519_113045.jpg or 20260519_113045.jpg
+    const m = file.name.match(/(\d{4})(\d{2})(\d{2})[_\-](\d{2})(\d{2})(\d{2})/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+    // 3. Fall back to file modified time
     return new Date(file.lastModified);
   }
 
