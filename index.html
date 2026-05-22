@@ -1716,7 +1716,7 @@ Format: section1|||section2|||section3|||section4`;
       const url     = URL.createObjectURL(blob);
       const link    = document.createElement('a');
       link.href     = url;
-      link.download = `OB_Log_${caseId.replace(/[^a-zA-Z0-9\-_]/g, '_')}.docx`;
+      link.download = `OB Log for ${caseId} at ${location}.docx`.replace(/[\/\\:*?"<>|]/g, '-');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
