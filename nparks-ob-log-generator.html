@@ -811,17 +811,109 @@
   // ── fast game ──────────────────────────────────────────────────────────────
   function openFastGame() {
     document.getElementById('fastGameOverlay').classList.add('open');
-    document.getElementById('fastGameText').focus();
+    setTimeout(() => document.getElementById('fastGameText').focus(), 100);
   }
   function closeFastGame() {
     document.getElementById('fastGameOverlay').classList.remove('open');
     document.getElementById('fastGameText').value = '';
   }
-  function submitFastGame() {
+
+  async function submitFastGame() {
     const text = document.getElementById('fastGameText').value.trim();
     if (!text) return;
-    // purpose to be wired up
-    closeFastGame();
+
+    const btn = document.querySelector('.fast-game-submit');
+    btn.disabled = true;
+    btn.textContent = '⏳ Parsing…';
+
+    const system = `You are a data parser for an NParks Singapore bird surveillance report system.
+Extract structured data from the user's free-form text and return ONLY a valid JSON object — no explanation, no markdown, no code fences.
+Current year: 2026.
+
+Fields to extract (only include fields clearly mentioned):
+- caseId: string
+- location: string
+- activationType: "Urgent" or "Non-Urgent"
+- activatingOfficer: string
+- activationDate: YYYY-MM-DD
+- officerName: string (only "Vinith Kumar" or "Bhavana Krishna" if recognisable)
+- days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", pigeons: number, mynas: number, crows: number, notes: string }
+- animalBehaviour: string
+- possibleHabitats: string
+- foodSources: string
+- environment: string
+
+Time parsing rules:
+- "1130" or "11:30am" or "11.30am" → "11:30"
+- "1430" or "2:30pm" or "2.30pm" → "14:30"
+- "2pm" → "14:00", "11am" → "11:00"
+Date parsing rules:
+- Dates without year: assume 2026
+- "21 may" → "2026-05-21"
+Return ONLY the JSON object.`;
+
+    try {
+      const res  = await fetch('/api/claude', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        body:    JSON.stringify({ system, messages: [{ role: 'user', content: text }] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+
+      // Strip accidental markdown fences
+      let raw = data.content[0].text.trim().replace(/^```json\s*/i, '').replace(/```\s*$/,'');
+      const parsed = JSON.parse(raw);
+      fillFromParsed(parsed);
+      closeFastGame();
+      showToast('Form filled from your notes!');
+    } catch (err) {
+      alert('Parsing failed: ' + err.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Submit';
+  }
+
+  function fillFromParsed(d) {
+    const setField = (id, v) => { if (v !== undefined && v !== null && v !== '') document.getElementById(id).value = v; };
+    setField('caseId',            d.caseId);
+    setField('location',          d.location);
+    setField('activatingOfficer', d.activatingOfficer);
+    setField('activationDate',    d.activationDate);
+    if (d.activationType) document.getElementById('activationType').value = d.activationType;
+    if (d.officerName)  { document.getElementById('officerName').value = d.officerName; fillOfficerHP(); }
+    setField('animalBehaviour',  d.animalBehaviour);
+    setField('possibleHabitats', d.possibleHabitats);
+    setField('foodSources',      d.foodSources);
+    setField('environment',      d.environment);
+
+    if (Array.isArray(d.days)) {
+      d.days.slice(0, 3).forEach((day, i) => {
+        const n = i + 1;
+        setField(`day${n}Date`,    day.date);
+        setField(`day${n}Start`,   day.start);
+        setField(`day${n}End`,     day.end);
+        setField(`day${n}Notes`,   day.notes);
+        if (day.pigeons !== undefined) setField(`day${n}Pigeons`, day.pigeons);
+        if (day.mynas   !== undefined) setField(`day${n}Mynas`,   day.mynas);
+        if (day.crows   !== undefined) setField(`day${n}Crows`,   day.crows);
+      });
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    Object.assign(t.style, {
+      position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+      background: '#1a5c2a', color: '#fff', padding: '10px 22px',
+      borderRadius: '50px', fontSize: '14px', fontWeight: '600',
+      zIndex: '999', boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+      transition: 'opacity 0.4s',
+    });
+    document.body.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2500);
   }
 
   // ── officer lookup ─────────────────────────────────────────────────────────
