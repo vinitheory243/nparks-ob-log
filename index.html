@@ -801,7 +801,7 @@
   <div id="step2Buttons" style="display:none">
     <div class="btn-row">
       <button class="btn-back" onclick="goStep1()">← Back</button>
-      <button class="btn-preview" onclick="previewReport()">Preview</button>
+
       <button class="btn-generate" id="generateBtn" onclick="generateDoc()">Generate .docx</button>
     </div>
   </div>
@@ -1011,19 +1011,23 @@ Return ONLY the JSON object.`;
     return `${slot.slice(0,2)}${slot.slice(2)} hrs`;
   }
 
-  async function resizeForDoc(file, displayW = 285, displayH = 214) {
-    // Read original bytes — no re-encoding, no quality loss
-    const buf = await file.arrayBuffer();
+  async function resizeForDoc(file) {
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
+      img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 }); };
       img.onload = () => {
-        // Only calculate the display dimensions; image data stays original
-        const ratio = Math.min(displayW / img.naturalWidth, displayH / img.naturalHeight, 1);
-        const w = Math.round(img.naturalWidth * ratio);
-        const h = Math.round(img.naturalHeight * ratio);
         URL.revokeObjectURL(url);
-        resolve({ buf, w, h });
+        const ratio = Math.min(0.5, 285 / img.naturalWidth, 214 / img.naturalHeight);
+        const w = Math.max(1, Math.round(img.naturalWidth  * ratio));
+        const h = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const b64   = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+        resolve({ buf: bytes.buffer, w, h });
       };
       img.src = url;
     });
@@ -1272,9 +1276,30 @@ Format: section1|||section2|||section3|||section4`;
       `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows</p>`
     ).join('<br>');
 
-    const photoNote = processedPhotos.length > 0
-      ? `<p style="color:#1a5c2a;font-style:italic;margin-top:8pt;">${processedPhotos.length} photo(s) will be embedded in the .docx file.</p>`
-      : `<p style="color:#888;font-style:italic;margin-top:8pt;">No photos selected.</p>`;
+    let photoNote = '';
+    if (processedPhotos.length > 0) {
+      const byDay = {};
+      processedPhotos.forEach(p => {
+        const dk = p.dayIdx >= 0 ? p.dayIdx : 'other';
+        if (!byDay[dk]) byDay[dk] = {};
+        if (!byDay[dk][p.slot]) byDay[dk][p.slot] = [];
+        byDay[dk][p.slot].push(p);
+      });
+      Object.keys(byDay).sort((a,b) => a === 'other' ? 1 : b === 'other' ? -1 : +a - +b).forEach(dk => {
+        const dayLabel = dk === 'other' ? '⚠️ Unmatched' : (days[+dk] ? days[+dk].date : `Day ${+dk+1}`);
+        photoNote += `<p style="font-weight:bold;margin:8pt 0 4pt;font-size:11pt;">${dayLabel}</p>`;
+        Object.entries(byDay[dk]).sort().forEach(([slot, photos]) => {
+          photoNote += `<p style="color:#555;font-size:10pt;margin:4pt 0 2pt;">${slotDisplay(slot)}</p>`;
+          photoNote += `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8pt;">`;
+          photos.forEach(p => {
+            photoNote += `<img src="${p.thumbUrl}" style="max-width:150px;max-height:113px;object-fit:contain;border:1px solid #ccc;border-radius:3px;">`;
+          });
+          photoNote += `</div>`;
+        });
+      });
+    } else {
+      photoNote = `<p style="color:#888;font-style:italic;margin-top:8pt;">No photos selected.</p>`;
+    }
 
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>Preview – OB LOG FOR ${caseId}</title>
@@ -1585,7 +1610,7 @@ Format: section1|||section2|||section3|||section4`;
         // Embed observation photos (2 per row) above the notes text
         for (let i = 0; i < dPhotos.length; i += 2) {
           const pair    = dPhotos.slice(i, i + 2);
-          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file, 230, 173)));
+          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
           const imgCells = resized.map(r => new D.TableCell({
             children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
             borders:  { top: noB, bottom: noB, left: noB, right: noB },
@@ -1663,27 +1688,32 @@ Format: section1|||section2|||section3|||section4`;
 
       // ── Photo sections ─────────────────────────────────────────────────────
       if (processedPhotos.length > 0) {
-        const noB = { style: D.BorderStyle.NONE, size: 0, color: 'auto' };
-        for (let di = 0; di < days.length; di++) {
-          const dayPhotos = processedPhotos.filter(p => p.dayIdx === di);
-          if (!dayPhotos.length) continue;
-          const day = days[di];
-          docChildren.push(new D.Paragraph({
-            children: [TR({ text: `PHOTOGRAPHS / VIDEOS: ${day.date} | ${fmtTime(day.start)}–${fmtTime(day.end)}`, bold: true, size: 24 })],
-            spacing: { before: 240, after: 120 },
-          }));
+        const noB       = { style: D.BorderStyle.NONE, size: 0, color: 'auto' };
+        const total     = processedPhotos.filter(p => p.dayIdx >= 0).length;
+        let   embedded  = 0;
+
+        const embedPhotoRows = async (photos) => {
           const slotMap = {};
-          dayPhotos.forEach(p => { if (!slotMap[p.slot]) slotMap[p.slot] = []; slotMap[p.slot].push(p); });
+          photos.forEach(p => { if (!slotMap[p.slot]) slotMap[p.slot] = []; slotMap[p.slot].push(p); });
           for (const [slot, sPhotos] of Object.entries(slotMap).sort()) {
             docChildren.push(new D.Paragraph({ children: [TR({ text: slotDisplay(slot), bold: true })], spacing: { before: 160, after: 80 } }));
             for (let i = 0; i < sPhotos.length; i += 2) {
               const pair    = sPhotos.slice(i, i + 2);
               const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
-              const imgCells = resized.map(r => new D.TableCell({
-                children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
-                borders:  { top: noB, bottom: noB, left: noB, right: noB },
-                margins:  { top: 40, bottom: 40, left: 60, right: 60 },
-              }));
+              embedded += pair.length;
+              btn.textContent = `Embedding photos… (${embedded}/${total})`;
+              const imgCells = resized.map(r => {
+                if (!r.buf.byteLength) return new D.TableCell({ children: [new D.Paragraph({ children: [TR({ text: '[image]' })] })], borders: { top: noB, bottom: noB, left: noB, right: noB } });
+                try {
+                  return new D.TableCell({
+                    children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
+                    borders:  { top: noB, bottom: noB, left: noB, right: noB },
+                    margins:  { top: 40, bottom: 40, left: 60, right: 60 },
+                  });
+                } catch(e) {
+                  return new D.TableCell({ children: [new D.Paragraph({ children: [TR({ text: '[image]' })] })], borders: { top: noB, bottom: noB, left: noB, right: noB } });
+                }
+              });
               if (imgCells.length === 1) imgCells.push(new D.TableCell({ children: [emptyPara()], borders: { top: noB, bottom: noB, left: noB, right: noB } }));
               docChildren.push(new D.Table({
                 width:   { size: 100, type: D.WidthType.PERCENTAGE },
@@ -1693,7 +1723,20 @@ Format: section1|||section2|||section3|||section4`;
               docChildren.push(emptyPara());
             }
           }
+        };
+
+        for (let di = 0; di < days.length; di++) {
+          const dayPhotos = processedPhotos.filter(p => p.dayIdx === di);
+          if (!dayPhotos.length) continue;
+          const day = days[di];
+          docChildren.push(new D.Paragraph({
+            children: [TR({ text: `PHOTOGRAPHS / VIDEOS: ${day.date} | ${fmtTime(day.start)}–${fmtTime(day.end)}`, bold: true, size: 24 })],
+            spacing: { before: 240, after: 120 },
+          }));
+          await embedPhotoRows(dayPhotos);
         }
+
+        btn.textContent = 'Finalising document…';
       }
 
       // ── Signature ─────────────────────────────────────────────────────────
