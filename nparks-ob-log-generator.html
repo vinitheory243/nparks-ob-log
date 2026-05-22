@@ -1012,17 +1012,66 @@ Return ONLY the JSON object.`;
   }
 
   async function resizeForDoc(file, displayW = 285, displayH = 214) {
-    const buf = await file.arrayBuffer();
+    // Get EXIF orientation (lite build supports JPEG)
+    let orientation = 1;
+    try {
+      if (window.exifr) {
+        const d = await window.exifr.parse(file, ['Orientation']);
+        if (d?.Orientation) orientation = d.Orientation;
+      }
+    } catch(e) {}
+
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
-      const done = (w, h) => { URL.revokeObjectURL(url); resolve({ buf, w, h }); };
-      img.onload = () => {
-        const ratio = Math.min(displayW / img.naturalWidth, displayH / img.naturalHeight, 1);
-        done(Math.max(1, Math.round(img.naturalWidth * ratio)),
-             Math.max(1, Math.round(img.naturalHeight * ratio)));
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
       };
-      img.onerror = () => done(displayW, displayH);
+
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        try {
+          // Orientations 5-8 rotate 90°/270° — swap width/height
+          const swapped = orientation >= 5;
+          const natW = swapped ? img.naturalHeight : img.naturalWidth;
+          const natH = swapped ? img.naturalWidth  : img.naturalHeight;
+
+          // Display dimensions in docx (maintains aspect ratio)
+          const dispRatio = Math.min(displayW / natW, displayH / natH, 1);
+          const dispW = Math.max(1, Math.round(natW * dispRatio));
+          const dispH = Math.max(1, Math.round(natH * dispRatio));
+
+          // Canvas at max 900px on longest side — good quality, manageable size
+          const canvasRatio = Math.min(900 / natW, 900 / natH, 1);
+          const cw = Math.max(1, Math.round(natW * canvasRatio));
+          const ch = Math.max(1, Math.round(natH * canvasRatio));
+
+          const canvas = document.createElement('canvas');
+          canvas.width  = cw;
+          canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          ctx.save();
+          ctx.translate(cw / 2, ch / 2);
+          const angle = { 3: Math.PI, 6: Math.PI / 2, 8: -Math.PI / 2 }[orientation] || 0;
+          if (angle) ctx.rotate(angle);
+          // For swapped orientations, raw image axes are transposed
+          if (swapped) ctx.drawImage(img, -ch / 2, -cw / 2, ch, cw);
+          else         ctx.drawImage(img, -cw / 2, -ch / 2, cw, ch);
+          ctx.restore();
+
+          canvas.toBlob(blob => {
+            if (!blob) { resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH }); return; }
+            blob.arrayBuffer()
+              .then(buf => resolve({ buf, w: dispW, h: dispH }))
+              .catch(()  => resolve({ buf: new ArrayBuffer(0), w: dispW, h: dispH }));
+          }, 'image/jpeg', 0.75);
+        } catch(e) {
+          resolve({ buf: new ArrayBuffer(0), w: displayW, h: displayH });
+        }
+      };
+
       img.src = url;
     });
   }
@@ -1682,7 +1731,9 @@ Format: section1|||section2|||section3|||section4`;
 
       // ── Photo sections ─────────────────────────────────────────────────────
       if (processedPhotos.length > 0) {
-        const noB = { style: D.BorderStyle.NONE, size: 0, color: 'auto' };
+        const noB       = { style: D.BorderStyle.NONE, size: 0, color: 'auto' };
+        const total     = processedPhotos.filter(p => p.dayIdx >= 0).length;
+        let   embedded  = 0;
 
         const embedPhotoRows = async (photos) => {
           const slotMap = {};
@@ -1692,7 +1743,10 @@ Format: section1|||section2|||section3|||section4`;
             for (let i = 0; i < sPhotos.length; i += 2) {
               const pair    = sPhotos.slice(i, i + 2);
               const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
+              embedded += pair.length;
+              btn.textContent = `Embedding photos… (${embedded}/${total})`;
               const imgCells = resized.map(r => {
+                if (!r.buf.byteLength) return new D.TableCell({ children: [new D.Paragraph({ children: [TR({ text: '[image]' })] })], borders: { top: noB, bottom: noB, left: noB, right: noB } });
                 try {
                   return new D.TableCell({
                     children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
@@ -1724,6 +1778,8 @@ Format: section1|||section2|||section3|||section4`;
           }));
           await embedPhotoRows(dayPhotos);
         }
+
+        btn.textContent = 'Finalising document…';
       }
 
       // ── Signature ─────────────────────────────────────────────────────────
