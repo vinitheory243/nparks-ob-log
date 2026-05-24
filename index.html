@@ -977,11 +977,11 @@ Return ONLY the JSON object.`;
   let survDayPhotos = { 1: [], 2: [], 3: [] };
 
   async function handleDayPhoto(day, files) {
-    survDayPhotos[day].forEach(p => URL.revokeObjectURL(p.thumbUrl));
-    survDayPhotos[day] = Array.from(files).map(file => ({
+    const newPhotos = Array.from(files).map(file => ({
       file,
       thumbUrl: URL.createObjectURL(file),
     }));
+    survDayPhotos[day] = survDayPhotos[day].concat(newPhotos);
     renderDayThumbs(day);
   }
 
