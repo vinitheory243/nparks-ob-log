@@ -1265,7 +1265,7 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
 
     const prompts = {
       animalBehaviour: `Write the animal behaviour section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe typical pigeon/myna/crow behaviour: perching, foraging, cooing, any feeding by public.`,
-      possibleHabitats: `Write the possible habitats section for a bird surveillance at ${location}.\n${daysSummary}\nList 3 to 5 specific habitats as a numbered list (1. 2. 3. etc). Each point is one short line. No paragraph text, only the numbered points.`,
+      possibleHabitats: `Write the possible habitats section for a bird surveillance at ${location}.\n${daysSummary}\nReturn EXACTLY 3 numbered points (1. 2. 3.). Each point is one short line. No intro sentence, no header, no paragraph text — only the 3 numbered points, nothing else before or after.`,
       foodSources: `Write the food sources / evidence of feeding section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe food remnants, refuse areas, note if no deliberate feeders found.`,
       environment: `Write the environment description for a bird surveillance at ${location}.\n${daysSummary}\nDescribe type of building, surroundings, weather.`,
     };
