@@ -1222,9 +1222,19 @@ Return ONLY the JSON object.`;
     const mynas    = document.getElementById(`day${day}Mynas`).value   || '0';
     const crows    = document.getElementById(`day${day}Crows`).value   || '0';
 
-    const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout. Sound like a real officer writing naturally, not a formal report template. Plain text only — no titles, no headers, no bold, no asterisks, no markdown. Write 3–5 sentences across 2–3 short paragraphs. Start with "I arrived" or "I commenced".`;
+    const existing = document.getElementById(`day${day}Notes`).value.trim();
 
-    const prompt = `Write my first-person observation notes for this surveillance shift:
+    const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout. Sound like a real officer writing naturally, not a formal report template. Plain text only — no titles, no headers, no bold, no asterisks, no markdown. Write 3–5 sentences across 2–3 short paragraphs.`;
+
+    const prompt = existing
+      ? `Rephrase and expand these rough notes into polished first-person observation notes. Keep ALL the details and context from the original — do not invent new facts or discard anything. Just make it flow naturally as a first-person field report written by the officer who was there.
+
+Shift details:
+Location: ${location}, Date: ${date}, Shift: ${start} to ${end}, Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows
+
+Officer's rough notes to rephrase:
+${existing}`
+      : `Write my first-person observation notes for this surveillance shift:
 Location: ${location}
 Date: ${date}
 Shift: ${start} to ${end}
