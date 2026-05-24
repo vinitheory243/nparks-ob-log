@@ -1689,22 +1689,14 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         const dPhotos = survDayPhotos[d.idx] || [];
         const rightCellChildren = [];
 
-        // Embed observation photos (2 per row) above the notes text
+        // Embed observation photos inline (2 per paragraph, no inner table = no dividing line)
         for (let i = 0; i < dPhotos.length; i += 2) {
           const pair    = dPhotos.slice(i, i + 2);
           const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
-          const imgCells = resized.map(r => new D.TableCell({
-            children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
-            borders:  { top: noB, bottom: noB, left: noB, right: noB },
-            margins:  { top: 40, bottom: 40, left: 0, right: 60 },
-          }));
-          if (imgCells.length === 1) imgCells.push(new D.TableCell({ children: [emptyPara()], borders: { top: noB, bottom: noB, left: noB, right: noB } }));
-          rightCellChildren.push(new D.Table({
-            width:   { size: 100, type: D.WidthType.PERCENTAGE },
-            rows:    [new D.TableRow({ children: imgCells })],
-            borders: { top: noB, bottom: noB, left: noB, right: noB, insideH: noB, insideV: noB },
-          }));
-          rightCellChildren.push(emptyPara());
+          const imgRuns = resized.filter(r => r.buf.byteLength).map(r =>
+            new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })
+          );
+          if (imgRuns.length) rightCellChildren.push(new D.Paragraph({ children: imgRuns, spacing: { before: 40, after: 40 } }));
         }
 
         // Observation notes text
@@ -1785,25 +1777,11 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
               const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
               embedded += pair.length;
               btn.textContent = `Embedding photos… (${embedded}/${total})`;
-              const imgCells = resized.map(r => {
-                if (!r.buf.byteLength) return new D.TableCell({ children: [new D.Paragraph({ children: [TR({ text: '[image]' })] })], borders: { top: noB, bottom: noB, left: noB, right: noB } });
-                try {
-                  return new D.TableCell({
-                    children: [new D.Paragraph({ children: [new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })], spacing: sp0 })],
-                    borders:  { top: noB, bottom: noB, left: noB, right: noB },
-                    margins:  { top: 40, bottom: 40, left: 60, right: 60 },
-                  });
-                } catch(e) {
-                  return new D.TableCell({ children: [new D.Paragraph({ children: [TR({ text: '[image]' })] })], borders: { top: noB, bottom: noB, left: noB, right: noB } });
-                }
-              });
-              if (imgCells.length === 1) imgCells.push(new D.TableCell({ children: [emptyPara()], borders: { top: noB, bottom: noB, left: noB, right: noB } }));
-              docChildren.push(new D.Table({
-                width:   { size: 100, type: D.WidthType.PERCENTAGE },
-                rows:    [new D.TableRow({ children: imgCells })],
-                borders: { top: noB, bottom: noB, left: noB, right: noB, insideH: noB, insideV: noB },
-              }));
-              docChildren.push(emptyPara());
+              const imgRuns = resized.filter(r => r.buf.byteLength).map(r => {
+                try { return new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } }); }
+                catch(e) { return null; }
+              }).filter(Boolean);
+              if (imgRuns.length) docChildren.push(new D.Paragraph({ children: imgRuns, spacing: { before: 60, after: 60 } }));
             }
           }
         };
