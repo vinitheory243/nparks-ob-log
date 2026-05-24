@@ -1101,8 +1101,8 @@ Return ONLY the JSON object.`;
         canvas.width  = cw;
         canvas.height = ch;
         canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        // Display size in docx: fit within 570×428
-        const dRatio = Math.min(570 / img.naturalWidth, 428 / img.naturalHeight, 1);
+        // Display size in docx: fit within 310×233 (2-per-row fits on A4 without overflow)
+        const dRatio = Math.min(310 / img.naturalWidth, 233 / img.naturalHeight, 1);
         const w = Math.max(1, Math.round(img.naturalWidth  * dRatio));
         const h = Math.max(1, Math.round(img.naturalHeight * dRatio));
         const b64   = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
@@ -1587,14 +1587,18 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
           new D.Paragraph({ children: [TRs({ text: line })], spacing: sp0 })
         );
 
-      // Table cell helpers
+      // Usable page width in twips (A4: 11906 − 2×1260 margins = 9386; use 9360 for safety)
+      const PW = 9360;
+      const dxa = pct => Math.round(PW * pct / 100);
+
+      // Table cell helpers — absolute DXA widths so photos can't crush columns
       const hCell = (text, pct) => new D.TableCell({
         children: [new D.Paragraph({
           children: [TRs({ text, bold: true, color: WHITE })],
           spacing: sp0,
         })],
         shading: { fill: GREEN },
-        width:   { size: pct, type: D.WidthType.PERCENTAGE },
+        width:   { size: dxa(pct), type: D.WidthType.DXA },
         margins: { top: 80, bottom: 80, left: 120, right: 120 },
       });
 
@@ -1603,13 +1607,13 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
           children: [TRs({ text, bold: true })],
           spacing: sp0,
         })],
-        width:   { size: 30, type: D.WidthType.PERCENTAGE },
+        width:   { size: dxa(30), type: D.WidthType.DXA },
         margins: { top: 80, bottom: 80, left: 120, right: 120 },
       });
 
       const cCell = (paras, pct = 70) => new D.TableCell({
         children: paras,
-        width:   { size: pct, type: D.WidthType.PERCENTAGE },
+        width:   { size: dxa(pct), type: D.WidthType.DXA },
         margins: { top: 80, bottom: 80, left: 120, right: 120 },
       });
 
@@ -1631,7 +1635,8 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
 
       // ── Summary of Observations table ─────────────────────────────────────
       const summaryTable = new D.Table({
-        width: { size: 100, type: D.WidthType.PERCENTAGE },
+        width:  { size: PW, type: D.WidthType.DXA },
+        layout: { type: D.TableLayoutType.FIXED },
         rows: [
           new D.TableRow({
             children:    [hCell('Description', 30), hCell('Observations', 70)],
@@ -1714,12 +1719,12 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
                 new D.Paragraph({ children: [TRs({ text: d.date, bold: true })], spacing: sp0 }),
                 new D.Paragraph({ children: [TRs({ text: `${fmtTime(d.start)}–${fmtTime(d.end)}` })], spacing: sp0 }),
               ],
-              width:   { size: 25, type: D.WidthType.PERCENTAGE },
+              width:   { size: dxa(25), type: D.WidthType.DXA },
               margins: { top: 80, bottom: 80, left: 120, right: 120 },
             }),
             new D.TableCell({
               children: rightCellChildren,
-              width:    { size: 75, type: D.WidthType.PERCENTAGE },
+              width:    { size: dxa(75), type: D.WidthType.DXA },
               margins:  { top: 80, bottom: 80, left: 120, right: 120 },
             }),
           ],
@@ -1727,8 +1732,9 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
       }
 
       const survTable = new D.Table({
-        width: { size: 100, type: D.WidthType.PERCENTAGE },
-        rows:  survRows,
+        width:  { size: PW, type: D.WidthType.DXA },
+        layout: { type: D.TableLayoutType.FIXED },
+        rows:   survRows,
       });
 
       // ── today's date for signature ────────────────────────────────────────
