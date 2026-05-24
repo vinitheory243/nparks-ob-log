@@ -1222,15 +1222,15 @@ Return ONLY the JSON object.`;
     const mynas    = document.getElementById(`day${day}Mynas`).value   || '0';
     const crows    = document.getElementById(`day${day}Crows`).value   || '0';
 
-    const system = `You are an NParks Singapore field surveillance officer writing official observation notes for a government Occurrence Book report. Output plain text only — absolutely no titles, no headers, no bold, no asterisks, no markdown of any kind. Start directly with the observation content. 3–5 sentences.`;
+    const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout. Sound like a real officer writing naturally, not a formal report template. Plain text only — no titles, no headers, no bold, no asterisks, no markdown. Write 3–5 sentences across 2–3 short paragraphs. Start with "I arrived" or "I commenced".`;
 
-    const prompt = `Write observation notes for this bird surveillance shift:
+    const prompt = `Write my first-person observation notes for this surveillance shift:
 Location: ${location}
 Date: ${date}
 Shift: ${start} to ${end}
 Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows
 
-Describe what was observed — bird behaviour, perching locations, foraging activity, presence of feeders, and any public interaction. Keep it concise and professional.`;
+Write as the officer who was there. Include when I arrived, what I observed (bird behaviour, perching spots, foraging, any feeders or public interaction), and how the shift ended. Use "I" throughout. Sound human and natural.`;
 
     try {
       const text = await callClaude(system, prompt, btn);
