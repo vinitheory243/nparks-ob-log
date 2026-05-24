@@ -717,28 +717,39 @@
 
   <!-- Card 4: Summary Observations -->
   <div class="card">
-    <div class="card-title" style="justify-content:space-between;">
-      <span style="display:flex;align-items:center;gap:8px;"><span class="badge">4</span> Summary of Observations</span>
-      <button class="btn-ai" onclick="generateSummary(this)">✦ Generate All</button>
+    <div class="card-title">
+      <span class="badge">4</span> Summary of Observations
     </div>
-    <p class="hint" style="margin-bottom:16px;">Pre-filled with standard template text — click Generate All to tailor it to this report, or edit manually.</p>
+    <p class="hint" style="margin-bottom:16px;">Pre-filled with standard template text — click Generate on each box to tailor it to this report, or edit manually.</p>
     <div class="grid" style="gap:16px;">
       <div class="form-group">
-        <label>Animal Behaviour Displayed</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="margin-bottom:0;">Animal Behaviour Displayed</label>
+          <button class="btn-ai" onclick="generateSection('animalBehaviour', this)">✦ Generate</button>
+        </div>
         <textarea id="animalBehaviour" rows="5">Pigeons were observed perching along the ledges and sheltered overhangs of the activation site throughout the surveillance period. Occasional cooing was noted intermittently. Birds were seen foraging along the ground level near refuse collection areas. No aggressive or unusual behaviour was observed. Bird activity remained relatively consistent throughout the shifts with no significant changes noted. No deliberate feeding activity by any member of public was observed throughout the entire surveillance.</textarea>
       </div>
       <div class="form-group">
-        <label>Possible Habitats of the Animals</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="margin-bottom:0;">Possible Habitats of the Animals</label>
+          <button class="btn-ai" onclick="generateSection('possibleHabitats', this)">✦ Generate</button>
+        </div>
         <textarea id="possibleHabitats" rows="4">1. Ledges and overhangs along the external facade of the building structure
 2. Surrounding mature trees along the perimeter of the activation site
 3. Sheltered areas near the rubbish collection point</textarea>
       </div>
       <div class="form-group">
-        <label>Availability of Food Sources / Evidence of Feeding or Littering</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="margin-bottom:0;">Availability of Food Sources / Evidence of Feeding or Littering</label>
+          <button class="btn-ai" onclick="generateSection('foodSources', this)">✦ Generate</button>
+        </div>
         <textarea id="foodSources" rows="4">Scattered food remnants and general litter were observed near the refuse collection area and along the ground level of the outer perimeter. Birds were observed foraging on these food remnants. No deliberate food sources or evidence of active feeding by any person were found. As such, no feeders were sighted throughout the entire surveillance period.</textarea>
       </div>
       <div class="form-group">
-        <label>Environment (Buildings, Trees, Terrain)</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label style="margin-bottom:0;">Environment (Buildings, Trees, Terrain)</label>
+          <button class="btn-ai" onclick="generateSection('environment', this)">✦ Generate</button>
+        </div>
         <textarea id="environment" rows="3">The activation site is a hawker centre / residential block surrounded by trees and walkways. Surveillance was conducted along the outer perimeter and immediate vicinity of the location. Weather conditions were clear throughout the shift.</textarea>
       </div>
     </div>
@@ -1229,7 +1240,7 @@ Describe what was observed — bird behaviour, perching locations, foraging acti
     }
   }
 
-  async function generateSummary(btn) {
+  async function generateSection(field, btn) {
     const location = val('location') || 'the activation site';
     const days = [];
     for (let i = 1; i <= 3; i++) {
@@ -1250,32 +1261,18 @@ Describe what was observed — bird behaviour, perching locations, foraging acti
       `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows`
     ).join('\n');
 
-    const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — absolutely no titles, no headers, no bold, no asterisks, no markdown of any kind. Each section starts directly with content. 2–4 sentences per section.`;
+    const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
 
-    const prompt = `Based on this bird surveillance at ${location}, write 4 separate sections. Return them separated by the exact delimiter "|||" with no extra text before or after each section.
-
-Surveillance data:
-${daysSummary}
-
-Section 1 — Animal behaviour displayed (describe typical pigeon/myna/crow behaviour: perching, foraging, cooing, any feeding by public)
-Section 2 — Possible habitats (ledges, trees, sheltered areas specific to the site)
-Section 3 — Availability of food sources / evidence of feeding or littering (food remnants, refuse areas, no deliberate feeders found)
-Section 4 — Environment description (type of building, surroundings, weather)
-
-Format: section1|||section2|||section3|||section4`;
+    const prompts = {
+      animalBehaviour: `Write the animal behaviour section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe typical pigeon/myna/crow behaviour: perching, foraging, cooing, any feeding by public.`,
+      possibleHabitats: `Write the possible habitats section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe ledges, trees, sheltered areas specific to the site.`,
+      foodSources: `Write the food sources / evidence of feeding section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe food remnants, refuse areas, note if no deliberate feeders found.`,
+      environment: `Write the environment description for a bird surveillance at ${location}.\n${daysSummary}\nDescribe type of building, surroundings, weather.`,
+    };
 
     try {
-      const text = await callClaude(system, prompt, btn, '⏳ Generating All…');
-      const parts = text.split('|||');
-      if (parts.length >= 4) {
-        document.getElementById('animalBehaviour').value  = parts[0].trim();
-        document.getElementById('possibleHabitats').value = parts[1].trim();
-        document.getElementById('foodSources').value      = parts[2].trim();
-        document.getElementById('environment').value      = parts[3].trim();
-      } else {
-        document.getElementById('animalBehaviour').value = text;
-        alert('Got a partial response — pasted into Animal Behaviour. Try again for individual sections.');
-      }
+      const text = await callClaude(system, prompts[field], btn);
+      document.getElementById(field).value = text;
     } catch (err) {
       alert('AI generation failed: ' + err.message);
     }
