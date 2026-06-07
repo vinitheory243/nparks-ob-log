@@ -136,9 +136,11 @@
     /* 3-col on mobile: date/start/end wrap to row 1, birds to row 2 */
     .bird-row {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(12, 1fr);
       gap: 5px;
     }
+    .bird-row > :nth-child(-n+3) { grid-column: span 4; }
+    .bird-row > :nth-child(n+4)  { grid-column: span 3; }
     .bird-row .form-group label { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bird-row input { padding: 7px 4px; font-size: 12px; min-width: 0; }
 
@@ -186,6 +188,7 @@
       .span2 { grid-column: span 2; }
       .span3 { grid-column: span 3; }
       .bird-row { grid-template-columns: 1.6fr 1.1fr 1.1fr 72px 72px 72px 72px; gap: 8px; }
+      .bird-row > :nth-child(-n+3), .bird-row > :nth-child(n+4) { grid-column: auto; }
       .bird-row .form-group label { font-size: 11px; }
       .bird-row input { padding: 8px 6px; font-size: 13px; }
       .btn-wrap { position: static; background: none; padding: 8px 0 40px; }
