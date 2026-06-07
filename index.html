@@ -569,6 +569,7 @@
           <option value="">Select officer…</option>
           <option value="Vinith Kumar">Vinith Kumar</option>
           <option value="Bhavana Krishna">Bhavana Krishna</option>
+          <option value="Tharish Kumar">Tharish Kumar</option>
         </select>
       </div>
       <div class="form-group">
@@ -849,7 +850,7 @@ Fields to extract (only include fields clearly mentioned):
 - activationType: "Urgent" or "Non-Urgent"
 - activatingOfficer: string
 - activationDate: YYYY-MM-DD
-- officerName: string (only "Vinith Kumar" or "Bhavana Krishna" if recognisable)
+- officerName: string (only "Vinith Kumar", "Bhavana Krishna", or "Tharish Kumar" if recognisable)
 - days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", pigeons: number, mynas: number, crows: number, notes: string }
 - animalBehaviour: string
 - possibleHabitats: string
@@ -933,6 +934,7 @@ Return ONLY the JSON object.`;
   const OFFICERS = {
     'Vinith Kumar':   '81198326',
     'Bhavana Krishna': '83636240',
+    'Tharish Kumar':   '91698695',
   };
   function autoEndTime(day) {
     const startEl = document.getElementById(`day${day}Start`);
