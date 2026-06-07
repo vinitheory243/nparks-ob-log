@@ -613,6 +613,10 @@
           <label>Crows</label>
           <input type="number" id="day1Crows" min="0" value="0" />
         </div>
+        <div class="form-group">
+          <label>Chickens</label>
+          <input type="number" id="day1Chickens" min="0" value="0" />
+        </div>
       </div>
       <div class="form-group" style="margin-top:12px;">
         <label class="label-row">Day 1 Observation Notes
@@ -657,6 +661,10 @@
           <label>Crows</label>
           <input type="number" id="day2Crows" min="0" value="0" />
         </div>
+        <div class="form-group">
+          <label>Chickens</label>
+          <input type="number" id="day2Chickens" min="0" value="0" />
+        </div>
       </div>
       <div class="form-group" style="margin-top:12px;">
         <label class="label-row">Day 2 Observation Notes
@@ -700,6 +708,10 @@
         <div class="form-group">
           <label>Crows</label>
           <input type="number" id="day3Crows" min="0" value="0" />
+        </div>
+        <div class="form-group">
+          <label>Chickens</label>
+          <input type="number" id="day3Chickens" min="0" value="0" />
         </div>
       </div>
       <div class="form-group" style="margin-top:12px;">
@@ -851,7 +863,7 @@ Fields to extract (only include fields clearly mentioned):
 - activatingOfficer: string
 - activationDate: YYYY-MM-DD
 - officerName: string (only "Vinith Kumar", "Bhavana Krishna", or "Tharish Kumar" if recognisable)
-- days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", pigeons: number, mynas: number, crows: number, notes: string }
+- days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", pigeons: number, mynas: number, crows: number, chickens: number, notes: string }
 - animalBehaviour: string
 - possibleHabitats: string
 - foodSources: string
@@ -909,9 +921,10 @@ Return ONLY the JSON object.`;
         setField(`day${n}Start`,   day.start);
         setField(`day${n}End`,     day.end);
         setField(`day${n}Notes`,   day.notes);
-        if (day.pigeons !== undefined) setField(`day${n}Pigeons`, day.pigeons);
-        if (day.mynas   !== undefined) setField(`day${n}Mynas`,   day.mynas);
-        if (day.crows   !== undefined) setField(`day${n}Crows`,   day.crows);
+        if (day.pigeons   !== undefined) setField(`day${n}Pigeons`,   day.pigeons);
+        if (day.mynas     !== undefined) setField(`day${n}Mynas`,     day.mynas);
+        if (day.crows     !== undefined) setField(`day${n}Crows`,     day.crows);
+        if (day.chickens  !== undefined) setField(`day${n}Chickens`,  day.chickens);
       });
     }
   }
@@ -1220,9 +1233,10 @@ Return ONLY the JSON object.`;
     const date     = fmtDate(dateRaw) || 'the surveillance date';
     const start    = fmtTime(document.getElementById(`day${day}Start`).value);
     const end      = fmtTime(document.getElementById(`day${day}End`).value);
-    const pigeons  = document.getElementById(`day${day}Pigeons`).value || '0';
-    const mynas    = document.getElementById(`day${day}Mynas`).value   || '0';
-    const crows    = document.getElementById(`day${day}Crows`).value   || '0';
+    const pigeons  = document.getElementById(`day${day}Pigeons`).value   || '0';
+    const mynas    = document.getElementById(`day${day}Mynas`).value     || '0';
+    const crows    = document.getElementById(`day${day}Crows`).value     || '0';
+    const chickens = document.getElementById(`day${day}Chickens`).value  || '0';
 
     const existing = document.getElementById(`day${day}Notes`).value.trim();
 
@@ -1232,7 +1246,7 @@ Return ONLY the JSON object.`;
       ? `Rephrase and expand these rough notes into polished first-person observation notes. Keep ALL the details and context from the original — do not invent new facts or discard anything. Just make it flow naturally as a first-person field report written by the officer who was there.
 
 Shift details:
-Location: ${location}, Date: ${date}, Shift: ${start} to ${end}, Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows
+Location: ${location}, Date: ${date}, Shift: ${start} to ${end}, Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
 
 Officer's rough notes to rephrase:
 ${existing}`
@@ -1240,7 +1254,7 @@ ${existing}`
 Location: ${location}
 Date: ${date}
 Shift: ${start} to ${end}
-Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows
+Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
 
 Write as the officer who was there. Include when I arrived, what I observed (bird behaviour, perching spots, foraging, any feeders or public interaction), and how the shift ended. Use "I" throughout. Sound human and natural.`;
 
@@ -1262,15 +1276,16 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         date:    fmtDate(dr),
         start:   fmtTime(document.getElementById(`day${i}Start`).value),
         end:     fmtTime(document.getElementById(`day${i}End`).value),
-        pigeons: document.getElementById(`day${i}Pigeons`).value || '0',
-        mynas:   document.getElementById(`day${i}Mynas`).value   || '0',
-        crows:   document.getElementById(`day${i}Crows`).value   || '0',
+        pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
+        mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
+        crows:    document.getElementById(`day${i}Crows`).value     || '0',
+        chickens: document.getElementById(`day${i}Chickens`).value  || '0',
       });
     }
     if (!days.length) { alert('Please fill in at least Day 1 before generating.'); return; }
 
     const daysSummary = days.map((d, i) =>
-      `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows`
+      `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens`
     ).join('\n');
 
     const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
@@ -1317,10 +1332,11 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         dateRaw,
         start:   document.getElementById(`day${i}Start`).value,
         end:     document.getElementById(`day${i}End`).value,
-        pigeons: document.getElementById(`day${i}Pigeons`).value || '0',
-        mynas:   document.getElementById(`day${i}Mynas`).value   || '0',
-        crows:   document.getElementById(`day${i}Crows`).value   || '0',
-        notes:   document.getElementById(`day${i}Notes`).value,
+        pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
+        mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
+        crows:    document.getElementById(`day${i}Crows`).value     || '0',
+        chickens: document.getElementById(`day${i}Chickens`).value  || '0',
+        notes:    document.getElementById(`day${i}Notes`).value,
       });
     }
 
@@ -1351,7 +1367,7 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
     }).join('');
 
     const sightingsCells = days.map(d =>
-      `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows</p>`
+      `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens</p>`
     ).join('<br>');
 
     let photoNote = '';
@@ -1552,10 +1568,11 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
           dateRaw,
           start:   document.getElementById(`day${i}Start`).value,
           end:     document.getElementById(`day${i}End`).value,
-          pigeons: document.getElementById(`day${i}Pigeons`).value || '0',
-          mynas:   document.getElementById(`day${i}Mynas`).value   || '0',
-          crows:   document.getElementById(`day${i}Crows`).value   || '0',
-          notes:   document.getElementById(`day${i}Notes`).value,
+          pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
+          mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
+          crows:    document.getElementById(`day${i}Crows`).value     || '0',
+          chickens: document.getElementById(`day${i}Chickens`).value  || '0',
+          notes:    document.getElementById(`day${i}Notes`).value,
         });
       }
 
@@ -1628,7 +1645,7 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         }));
         sightingParas.push(new D.Paragraph({
           children: [TRs({
-            text: `Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows`,
+            text: `Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens`,
           })],
           spacing: sp0,
         }));
