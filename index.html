@@ -405,6 +405,47 @@
       justify-content: center; padding: 0; z-index: 2;
       -webkit-tap-highlight-color: transparent;
     }
+    .day-thumb-edit {
+      position: absolute; bottom: -5px; right: -5px;
+      width: 20px; height: 20px;
+      background: #1a5c2a; color: #fff;
+      border: 2px solid #fff; border-radius: 50%;
+      font-size: 11px; line-height: 1;
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; padding: 0; z-index: 2;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .day-thumb.annotated img { border-color: #e74c3c; border-width: 2px; }
+
+    /* ── Annotation modal ──────────────────────────────────────────────────── */
+    #annotateModal {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.82);
+      align-items: center; justify-content: center;
+    }
+    #annotateModal.open { display: flex; }
+    #annotateModalInner {
+      background: #fff; border-radius: 12px;
+      padding: 16px; max-width: 96vw; max-height: 94vh;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    #annotateCanvas {
+      cursor: crosshair; border-radius: 6px;
+      max-width: calc(96vw - 32px); max-height: calc(94vh - 110px);
+      display: block;
+    }
+    .annotate-toolbar {
+      display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    }
+    .annotate-toolbar span { font-size: 13px; color: #555; flex: 1; }
+    .btn-annot {
+      padding: 7px 14px; border-radius: 7px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-annot-undo  { background: #f0f0f0; color: #333; }
+    .btn-annot-clear { background: #fdecea; color: #c0392b; }
+    .btn-annot-done  { background: #1a5c2a; color: #fff; }
 
     /* ── AI generate button ─────────────────────────────────────────────────── */
     .btn-ai {
@@ -996,7 +1037,8 @@ Return ONLY the JSON object.`;
   }
 
   // ── Per-day observation photos ─────────────────────────────────────────────
-  let survDayPhotos = { 1: [], 2: [], 3: [] };
+  let survDayPhotos       = { 1: [], 2: [], 3: [] };
+  let survDayAnnotations  = { 1: [], 2: [], 3: [] }; // per-photo rect arrays
 
   async function handleDayPhoto(day, files) {
     const newPhotos = Array.from(files).map(file => ({
@@ -1004,22 +1046,132 @@ Return ONLY the JSON object.`;
       thumbUrl: URL.createObjectURL(file),
     }));
     survDayPhotos[day] = survDayPhotos[day].concat(newPhotos);
+    // extend annotations array to match
+    while (survDayAnnotations[day].length < survDayPhotos[day].length)
+      survDayAnnotations[day].push([]);
     renderDayThumbs(day);
   }
 
   function renderDayThumbs(day) {
     const container = document.getElementById(`day${day}PhotoThumbs`);
-    container.innerHTML = survDayPhotos[day].map((p, i) => `
-      <div class="day-thumb">
+    container.innerHTML = survDayPhotos[day].map((p, i) => {
+      const hasAnnot = survDayAnnotations[day][i] && survDayAnnotations[day][i].length > 0;
+      return `
+      <div class="day-thumb${hasAnnot ? ' annotated' : ''}">
         <button class="day-thumb-remove" onclick="removeDayPhoto(${day},${i})">×</button>
+        <button class="day-thumb-edit"   onclick="openAnnotate(${day},${i})">✏</button>
         <img src="${p.thumbUrl}" loading="lazy" />
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function removeDayPhoto(day, idx) {
     URL.revokeObjectURL(survDayPhotos[day][idx].thumbUrl);
     survDayPhotos[day].splice(idx, 1);
+    survDayAnnotations[day].splice(idx, 1);
     renderDayThumbs(day);
+  }
+
+  // ── Annotation modal ───────────────────────────────────────────────────────
+  let _annotDay, _annotIdx;
+  let _annotRects = [];   // committed rects [{x1,y1,x2,y2} as fractions 0-1]
+  let _annotDrag  = null; // in-progress drag
+  let _annotImg   = null;
+
+  function openAnnotate(day, idx) {
+    _annotDay  = day;
+    _annotIdx  = idx;
+    _annotRects = (survDayAnnotations[day][idx] || []).map(r => ({...r}));
+
+    const photo = survDayPhotos[day][idx];
+    const img   = new Image();
+    img.onload = () => {
+      _annotImg = img;
+      const canvas  = document.getElementById('annotateCanvas');
+      // fit canvas to screen
+      const maxW = Math.min(img.naturalWidth,  window.innerWidth  * 0.92 - 32);
+      const maxH = Math.min(img.naturalHeight, window.innerHeight * 0.88 - 110);
+      const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+      canvas.width  = Math.round(img.naturalWidth  * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      _annotDrawAll();
+      document.getElementById('annotateModal').classList.add('open');
+    };
+    img.src = photo.thumbUrl;
+  }
+
+  function _annotDrawAll() {
+    const canvas = document.getElementById('annotateCanvas');
+    const ctx    = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(_annotImg, 0, 0, canvas.width, canvas.height);
+    const cw = canvas.width, ch = canvas.height;
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth   = Math.max(2, Math.round(cw / 150));
+    _annotRects.forEach(r => {
+      ctx.strokeRect(r.x1 * cw, r.y1 * ch, (r.x2 - r.x1) * cw, (r.y2 - r.y1) * ch);
+    });
+    if (_annotDrag) {
+      const {sx, sy, ex, ey} = _annotDrag;
+      ctx.strokeRect(sx * cw, sy * ch, (ex - sx) * cw, (ey - sy) * ch);
+    }
+  }
+
+  function _annotPt(e) {
+    const canvas = document.getElementById('annotateCanvas');
+    const rect   = canvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    return { x: cx / canvas.width, y: cy / canvas.height };
+  }
+
+  (function attachAnnotEvents() {
+    const canvas = document.getElementById('annotateCanvas');
+    function onStart(e) {
+      e.preventDefault();
+      const {x, y} = _annotPt(e);
+      _annotDrag = {sx: x, sy: y, ex: x, ey: y};
+    }
+    function onMove(e) {
+      e.preventDefault();
+      if (!_annotDrag) return;
+      const {x, y} = _annotPt(e);
+      _annotDrag.ex = x; _annotDrag.ey = y;
+      _annotDrawAll();
+    }
+    function onEnd(e) {
+      e.preventDefault();
+      if (!_annotDrag) return;
+      const {sx, sy, ex, ey} = _annotDrag;
+      if (Math.abs(ex - sx) > 0.01 && Math.abs(ey - sy) > 0.01) {
+        _annotRects.push({
+          x1: Math.min(sx, ex), y1: Math.min(sy, ey),
+          x2: Math.max(sx, ex), y2: Math.max(sy, ey),
+        });
+      }
+      _annotDrag = null;
+      _annotDrawAll();
+    }
+    canvas.addEventListener('mousedown',  onStart);
+    canvas.addEventListener('mousemove',  onMove);
+    canvas.addEventListener('mouseup',    onEnd);
+    canvas.addEventListener('touchstart', onStart, {passive: false});
+    canvas.addEventListener('touchmove',  onMove,  {passive: false});
+    canvas.addEventListener('touchend',   onEnd,   {passive: false});
+  })();
+
+  function annotUndo() {
+    _annotRects.pop();
+    _annotDrawAll();
+  }
+  function annotClear() {
+    _annotRects = [];
+    _annotDrawAll();
+  }
+  function annotDone() {
+    survDayAnnotations[_annotDay][_annotIdx] = _annotRects.map(r => ({...r}));
+    document.getElementById('annotateModal').classList.remove('open');
+    renderDayThumbs(_annotDay);
   }
 
   // ── Photo processing ───────────────────────────────────────────────────────
@@ -1110,22 +1262,29 @@ Return ONLY the JSON object.`;
     return `${slot.slice(0,2)}${slot.slice(2)} hrs`;
   }
 
-  async function resizeForDoc(file) {
+  async function resizeForDoc(file, rects) {
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 }); };
       img.onload = () => {
         URL.revokeObjectURL(url);
-        // Canvas: scale to max 1200px on longest side (high resolution for clarity)
         const cRatio = Math.min(1200 / img.naturalWidth, 1200 / img.naturalHeight, 1);
         const cw = Math.max(1, Math.round(img.naturalWidth  * cRatio));
         const ch = Math.max(1, Math.round(img.naturalHeight * cRatio));
         const canvas = document.createElement('canvas');
         canvas.width  = cw;
         canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-        // Display size in docx: fit within 310×233 (2-per-row fits on A4 without overflow)
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, cw, ch);
+        // Draw red annotation rectangles if any
+        if (rects && rects.length) {
+          ctx.strokeStyle = '#e74c3c';
+          ctx.lineWidth   = Math.max(3, Math.round(cw / 150));
+          rects.forEach(r => {
+            ctx.strokeRect(r.x1 * cw, r.y1 * ch, (r.x2 - r.x1) * cw, (r.y2 - r.y1) * ch);
+          });
+        }
         const dRatio = Math.min(310 / img.naturalWidth, 233 / img.naturalHeight, 1);
         const w = Math.max(1, Math.round(img.naturalWidth  * dRatio));
         const h = Math.max(1, Math.round(img.naturalHeight * dRatio));
@@ -1718,9 +1877,10 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         const rightCellChildren = [];
 
         // Embed observation photos inline (2 per paragraph, no inner table = no dividing line)
+        const dayAnnots = survDayAnnotations[d.idx] || [];
         for (let i = 0; i < dPhotos.length; i += 2) {
           const pair    = dPhotos.slice(i, i + 2);
-          const resized = await Promise.all(pair.map(p => resizeForDoc(p.file)));
+          const resized = await Promise.all(pair.map((p, j) => resizeForDoc(p.file, dayAnnots[i + j] || [])));
           const imgRuns = resized.filter(r => r.buf.byteLength).map(r =>
             new D.ImageRun({ data: new Uint8Array(r.buf), transformation: { width: r.w, height: r.h } })
           );
@@ -1863,5 +2023,18 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
     btn.disabled    = false;
   }
 </script>
+
+<!-- Annotation modal -->
+<div id="annotateModal">
+  <div id="annotateModalInner">
+    <div class="annotate-toolbar">
+      <span>Draw red boxes — click and drag on the photo</span>
+      <button class="btn-annot btn-annot-undo"  onclick="annotUndo()">↩ Undo</button>
+      <button class="btn-annot btn-annot-clear" onclick="annotClear()">✕ Clear all</button>
+      <button class="btn-annot btn-annot-done"  onclick="annotDone()">✓ Done</button>
+    </div>
+    <canvas id="annotateCanvas"></canvas>
+  </div>
+</div>
 </body>
 </html>
