@@ -778,7 +778,7 @@
     <div class="card-title"><span class="badge">5</span> Surveillance Photos</div>
     <p class="hint" style="margin-bottom:14px;">
       Select all photos for the report. Timestamps are read from EXIF data and each photo is
-      auto-slotted to the nearest 15-minute mark (e.g. 11:17 → 11:15 hrs).
+      auto-slotted to the nearest 15-minute mark (e.g. 11:08 → 11:00, 11:09 → 11:15 hrs).
     </p>
     <label class="photo-upload-label" for="photoInput">
       <div class="photo-upload-box">
@@ -1092,8 +1092,10 @@ Return ONLY the JSON object.`;
   }
 
   function slotKey(date) {
-    const h = date.getHours();
-    const m = Math.floor(date.getMinutes() / 15) * 15;
+    let h = date.getHours();
+    let m = Math.round(date.getMinutes() / 15) * 15;
+    if (m === 60) { h += 1; m = 0; }
+    if (h === 24) h = 0;
     return `${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}`;
   }
 
