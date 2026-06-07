@@ -1856,8 +1856,9 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
 
       // ── Summary of Observations table ─────────────────────────────────────
       const summaryTable = new D.Table({
-        width:  { size: PW, type: D.WidthType.DXA },
-        layout: { type: D.TableLayoutType.FIXED },
+        width:        { size: PW, type: D.WidthType.DXA },
+        layout:       { type: D.TableLayoutType.FIXED },
+        columnWidths: [dxa(30), dxa(70)],
         rows: [
           new D.TableRow({
             children:    [hCell('Description', 30), hCell('Observations', 70)],
@@ -1946,9 +1947,10 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
       }
 
       const survTable = new D.Table({
-        width:  { size: PW, type: D.WidthType.DXA },
-        layout: { type: D.TableLayoutType.FIXED },
-        rows:   survRows,
+        width:        { size: PW, type: D.WidthType.DXA },
+        layout:       { type: D.TableLayoutType.FIXED },
+        columnWidths: [dxa(30), dxa(70)],
+        rows:         survRows,
       });
 
       // ── today's date for signature ────────────────────────────────────────
