@@ -1125,8 +1125,9 @@ Return ONLY the JSON object.`;
     return { x: cx / canvas.width, y: cy / canvas.height };
   }
 
-  (function attachAnnotEvents() {
+  document.addEventListener('DOMContentLoaded', function attachAnnotEvents() {
     const canvas = document.getElementById('annotateCanvas');
+    if (!canvas) return;
     function onStart(e) {
       e.preventDefault();
       const {x, y} = _annotPt(e);
@@ -1158,7 +1159,7 @@ Return ONLY the JSON object.`;
     canvas.addEventListener('touchstart', onStart, {passive: false});
     canvas.addEventListener('touchmove',  onMove,  {passive: false});
     canvas.addEventListener('touchend',   onEnd,   {passive: false});
-  })();
+  });
 
   function annotUndo() {
     _annotRects.pop();
