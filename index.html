@@ -1066,7 +1066,9 @@ Return ONLY the JSON object.`;
   }
 
   function removeDayPhoto(day, idx) {
-    URL.revokeObjectURL(survDayPhotos[day][idx].thumbUrl);
+    const p = survDayPhotos[day][idx];
+    URL.revokeObjectURL(p.thumbUrl);
+    if (p.annotatedThumbUrl) URL.revokeObjectURL(p.annotatedThumbUrl);
     survDayPhotos[day].splice(idx, 1);
     survDayAnnotations[day].splice(idx, 1);
     renderDayThumbs(day);
@@ -1170,7 +1172,33 @@ Return ONLY the JSON object.`;
     _annotDrawAll();
   }
   function annotDone() {
-    survDayAnnotations[_annotDay][_annotIdx] = _annotRects.map(r => ({...r}));
+    const rects = _annotRects.map(r => ({...r}));
+    survDayAnnotations[_annotDay][_annotIdx] = rects;
+
+    // Bake annotations into a new thumbnail URL for the preview
+    const photo = survDayPhotos[_annotDay][_annotIdx];
+    if (photo.annotatedThumbUrl) URL.revokeObjectURL(photo.annotatedThumbUrl);
+
+    if (rects.length === 0) {
+      photo.annotatedThumbUrl = null;
+    } else {
+      // Draw on a canvas and store as a blob URL
+      const canvas = document.createElement('canvas');
+      canvas.width  = _annotImg.naturalWidth;
+      canvas.height = _annotImg.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(_annotImg, 0, 0);
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth   = Math.max(3, Math.round(canvas.width / 150));
+      rects.forEach(r => {
+        ctx.strokeRect(r.x1 * canvas.width, r.y1 * canvas.height,
+                       (r.x2 - r.x1) * canvas.width, (r.y2 - r.y1) * canvas.height);
+      });
+      canvas.toBlob(blob => {
+        photo.annotatedThumbUrl = URL.createObjectURL(blob);
+      }, 'image/jpeg', 0.92);
+    }
+
     document.getElementById('annotateModal').classList.remove('open');
     renderDayThumbs(_annotDay);
   }
@@ -1521,9 +1549,14 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
 
     const survObsRows = days.map((d, i) => {
       const dPhotos = survDayPhotos[d.idx] || [];
+      const dAnnots   = survDayAnnotations[d.idx] || [];
       const photoHtml = dPhotos.length > 0
         ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">${
-            dPhotos.map(p => `<img src="${p.thumbUrl}" style="max-width:210px;max-height:160px;object-fit:contain;border:1px solid #ddd;border-radius:3px;">`).join('')
+            dPhotos.map((p, pi) => {
+              const src = p.annotatedThumbUrl || p.thumbUrl;
+              const border = dAnnots[pi] && dAnnots[pi].length ? '2px solid #e74c3c' : '1px solid #ddd';
+              return `<img src="${src}" style="max-width:210px;max-height:160px;object-fit:contain;border:${border};border-radius:3px;">`;
+            }).join('')
           }</div>`
         : '';
       return `
