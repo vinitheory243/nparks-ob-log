@@ -144,6 +144,23 @@
     .bird-row .form-group label { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bird-row input { padding: 7px 4px; font-size: 12px; min-width: 0; }
 
+    /* Variable-width day rows — column count comes from the case type */
+    .day-grid { display: grid; gap: 6px; }
+    .day-grid .form-group label { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day-grid input { padding: 7px 6px; font-size: 13px; min-width: 0; }
+    @media (min-width: 600px) {
+      .day-grid { gap: 8px; }
+      .day-grid .form-group label { font-size: 11px; }
+    }
+    /* Hourly observation blocks (dog-type reports) */
+    .hour-block { margin-top: 10px; }
+    .hour-block-label {
+      font-size: 12px; font-weight: 700; color: #1a5c2a;
+      background: #eef7f0; border-radius: 6px;
+      padding: 5px 10px; margin-bottom: 5px; display: inline-block;
+    }
+    .hour-block textarea { min-height: 68px; }
+
     .hint { font-size: 12px; color: #888; margin-top: 2px; line-height: 1.4; }
     .divider { border: none; border-top: 1px dashed #ddd; margin: 16px 0; }
 
@@ -581,11 +598,16 @@
   <div class="card">
     <div class="card-title"><span class="badge">1</span> Case Details</div>
     <div class="grid g2">
+      <div class="form-group span2">
+        <label>Case Type</label>
+        <select id="caseType" onchange="onCaseTypeChange()"></select>
+        <p class="hint" id="caseTypeHint"></p>
+      </div>
       <div class="form-group">
         <label>Case ID</label>
         <input type="text" id="caseId" placeholder="NPARKS-202511-1681500" />
       </div>
-      <div class="form-group">
+      <div class="form-group" id="activationTypeGroup">
         <label>Type of Activation</label>
         <select id="activationType">
           <option>Non-Urgent</option>
@@ -604,6 +626,7 @@
         <label>Location</label>
         <input type="text" id="location" placeholder="e.g. 278 Bukit Batok E Ave 3 pavilion" />
       </div>
+      <div id="briefCustomWrap" class="span2"></div>
     </div>
   </div>
 
@@ -633,147 +656,7 @@
     <div class="card-title"><span class="badge">3</span> Surveillance Days</div>
     <p class="hint" style="margin-bottom:16px;">Days 2 and 3 are optional — leave the date blank to skip them.</p>
 
-    <!-- Day 1 -->
-    <div class="day-section">
-      <div class="day-header">Day 1</div>
-      <div class="bird-row">
-        <div class="form-group">
-          <label>Date</label>
-          <input type="date" id="day1Date" />
-        </div>
-        <div class="form-group">
-          <label>Start Time</label>
-          <input type="time" id="day1Start" value="11:30" onchange="autoEndTime(1)" />
-        </div>
-        <div class="form-group">
-          <label>End Time</label>
-          <input type="time" id="day1End" value="14:30" />
-        </div>
-        <div class="form-group">
-          <label>Pigeons</label>
-          <input type="number" id="day1Pigeons" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Mynas</label>
-          <input type="number" id="day1Mynas" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Crows</label>
-          <input type="number" id="day1Crows" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Chickens</label>
-          <input type="number" id="day1Chickens" min="0" value="0" />
-        </div>
-      </div>
-      <div class="form-group" style="margin-top:12px;">
-        <label class="label-row">Day 1 Observation Notes
-          <button class="btn-ai" onclick="generateDayNotes(1, this)">✦ Generate</button>
-        </label>
-        <textarea id="day1Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
-      </div>
-      <div class="day-photo-wrap">
-        <label class="btn-day-photo" for="day1ObsPhotos">📷 Add Photos to Observation</label>
-        <input type="file" id="day1ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(1, this.files)" />
-        <div id="day1PhotoThumbs" class="day-thumbs"></div>
-      </div>
-    </div>
-
-    <hr class="divider" />
-
-    <!-- Day 2 -->
-    <div class="day-section">
-      <div class="day-header">Day 2 <span style="font-weight:400;color:#888;">(optional)</span></div>
-      <div class="bird-row">
-        <div class="form-group">
-          <label>Date</label>
-          <input type="date" id="day2Date" />
-        </div>
-        <div class="form-group">
-          <label>Start Time</label>
-          <input type="time" id="day2Start" value="11:30" onchange="autoEndTime(2)" />
-        </div>
-        <div class="form-group">
-          <label>End Time</label>
-          <input type="time" id="day2End" value="14:30" />
-        </div>
-        <div class="form-group">
-          <label>Pigeons</label>
-          <input type="number" id="day2Pigeons" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Mynas</label>
-          <input type="number" id="day2Mynas" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Crows</label>
-          <input type="number" id="day2Crows" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Chickens</label>
-          <input type="number" id="day2Chickens" min="0" value="0" />
-        </div>
-      </div>
-      <div class="form-group" style="margin-top:12px;">
-        <label class="label-row">Day 2 Observation Notes
-          <button class="btn-ai" onclick="generateDayNotes(2, this)">✦ Generate</button>
-        </label>
-        <textarea id="day2Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
-      </div>
-      <div class="day-photo-wrap">
-        <label class="btn-day-photo" for="day2ObsPhotos">📷 Add Photos to Observation</label>
-        <input type="file" id="day2ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(2, this.files)" />
-        <div id="day2PhotoThumbs" class="day-thumbs"></div>
-      </div>
-    </div>
-
-    <hr class="divider" />
-
-    <!-- Day 3 -->
-    <div class="day-section">
-      <div class="day-header">Day 3 <span style="font-weight:400;color:#888;">(optional)</span></div>
-      <div class="bird-row">
-        <div class="form-group">
-          <label>Date</label>
-          <input type="date" id="day3Date" />
-        </div>
-        <div class="form-group">
-          <label>Start Time</label>
-          <input type="time" id="day3Start" value="11:30" onchange="autoEndTime(3)" />
-        </div>
-        <div class="form-group">
-          <label>End Time</label>
-          <input type="time" id="day3End" value="14:30" />
-        </div>
-        <div class="form-group">
-          <label>Pigeons</label>
-          <input type="number" id="day3Pigeons" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Mynas</label>
-          <input type="number" id="day3Mynas" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Crows</label>
-          <input type="number" id="day3Crows" min="0" value="0" />
-        </div>
-        <div class="form-group">
-          <label>Chickens</label>
-          <input type="number" id="day3Chickens" min="0" value="0" />
-        </div>
-      </div>
-      <div class="form-group" style="margin-top:12px;">
-        <label class="label-row">Day 3 Observation Notes
-          <button class="btn-ai" onclick="generateDayNotes(3, this)">✦ Generate</button>
-        </label>
-        <textarea id="day3Notes" rows="4" placeholder="Describe what was observed during this shift…"></textarea>
-      </div>
-      <div class="day-photo-wrap">
-        <label class="btn-day-photo" for="day3ObsPhotos">📷 Add Photos to Observation</label>
-        <input type="file" id="day3ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(3, this.files)" />
-        <div id="day3PhotoThumbs" class="day-thumbs"></div>
-      </div>
-    </div>
+    <div id="daysContainer"></div>
   </div>
 
   <!-- Card 4: Summary Observations -->
@@ -782,38 +665,7 @@
       <span class="badge">4</span> Summary of Observations
     </div>
     <p class="hint" style="margin-bottom:16px;">Pre-filled with standard template text — click Generate on each box to tailor it to this report, or edit manually.</p>
-    <div class="grid" style="gap:16px;">
-      <div class="form-group">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label style="margin-bottom:0;">Animal Behaviour Displayed</label>
-          <button class="btn-ai" onclick="generateSection('animalBehaviour', this)">✦ Generate</button>
-        </div>
-        <textarea id="animalBehaviour" rows="5">Pigeons were observed perching along the ledges and sheltered overhangs of the activation site throughout the surveillance period. Occasional cooing was noted intermittently. Birds were seen foraging along the ground level near refuse collection areas. No aggressive or unusual behaviour was observed. Bird activity remained relatively consistent throughout the shifts with no significant changes noted. No deliberate feeding activity by any member of public was observed throughout the entire surveillance.</textarea>
-      </div>
-      <div class="form-group">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label style="margin-bottom:0;">Possible Habitats of the Animals</label>
-          <button class="btn-ai" onclick="generateSection('possibleHabitats', this)">✦ Generate</button>
-        </div>
-        <textarea id="possibleHabitats" rows="4">1. Ledges and overhangs along the external facade of the building structure
-2. Surrounding mature trees along the perimeter of the activation site
-3. Sheltered areas near the rubbish collection point</textarea>
-      </div>
-      <div class="form-group">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label style="margin-bottom:0;">Availability of Food Sources / Evidence of Feeding or Littering</label>
-          <button class="btn-ai" onclick="generateSection('foodSources', this)">✦ Generate</button>
-        </div>
-        <textarea id="foodSources" rows="4">Scattered food remnants and general litter were observed near the refuse collection area and along the ground level of the outer perimeter. Birds were observed foraging on these food remnants. No deliberate food sources or evidence of active feeding by any person were found. As such, no feeders were sighted throughout the entire surveillance period.</textarea>
-      </div>
-      <div class="form-group">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <label style="margin-bottom:0;">Environment (Buildings, Trees, Terrain)</label>
-          <button class="btn-ai" onclick="generateSection('environment', this)">✦ Generate</button>
-        </div>
-        <textarea id="environment" rows="3">The activation site is a hawker centre / residential block surrounded by trees and walkways. Surveillance was conducted along the outer perimeter and immediate vicinity of the location. Weather conditions were clear throughout the shift.</textarea>
-      </div>
-    </div>
+    <div id="summaryContainer" class="grid" style="gap:16px;"></div>
   </div>
 
   </div><!-- /step1Content -->
@@ -882,6 +734,573 @@
     document.body.style.cssText = 'background:#fff;padding:20px;font-family:monospace;color:red;';
     document.body.innerHTML = '<h2>JS Error</h2><pre>' + msg + '\n\n' + (err?.stack || '') + '\n\nLine ' + line + ':' + col + '\n' + src + '</pre>';
   };
+  // ══════════════════════════════════════════════════════════════════════════
+  // CASE TYPES
+  // Everything that differs between one kind of surveillance and another lives
+  // in this one object: the activation brief, the per-day fields, the summary
+  // rows, the AI style examples and the .docx wording.
+  //
+  // TO ADD A NEW ANIMAL (cat, monkey, otter, macaque...):
+  // copy an existing entry, change the text, done. Nothing else in the file
+  // needs to be touched — the form, the prompts and the document all read from
+  // here. Style examples must be REAL text from reports NParks has accepted,
+  // reproduced verbatim; loose grammar and fragments are correct and wanted.
+  // ══════════════════════════════════════════════════════════════════════════
+  const CASE_TYPES = {
+
+    // ───────────────────────────────────────────────────────────── BIRDS ────
+    bird: {
+      label: 'Birds / Pigeons',
+      defaultStart: '11:30',
+      defaultEnd: '14:30',
+      hint: 'Feeding surveillance. Counts per species, notes written as flowing paragraphs.',
+      showActivationType: true,
+      hourly: false,
+
+      briefTitle: 'Monitor presence of bird feeding, bird population, or leaving of food',
+      briefSubtitle: 'Pigeon surveillance',
+      briefPoints: [
+        'To carry out surveillance for bird feeding.',
+        'To inform feeder that feeding any forms of wildlife is an offence and highlight that they can be fined up to $10,000.',
+        'Count no. of different bird species sighted and number of birds of each species sighted.',
+        'Distribute pamphlets to feeder and members of public encountered during surveillance.',
+      ],
+
+      counts: [
+        { key: 'Pigeons',  label: 'Pigeons'  },
+        { key: 'Mynas',    label: 'Mynas'    },
+        { key: 'Crows',    label: 'Crows'    },
+        { key: 'Chickens', label: 'Chickens' },
+      ],
+      texts: [],
+
+      summaryTableTitle: 'SUMMARY OF OBSERVATIONS',
+      detailsTableTitle: 'SURVEILLANCE OBSERVATIONS – DATE / TIME',
+      completedLine: '',
+      photoDayPrefix: false,
+      dateStyle: 'long',
+      attachments: [
+        'Photos and screenshots of videos taken minimally at 15-minute intervals.',
+        'Photographs/video (via email/phone) with date and time stamps, submitted herewith as proof of above surveillance and observations, in chronological order.',
+      ],
+
+      // Lines rendered in the "maximum number and description of animals sighted" cell
+      sighting: (d) => [
+        { text: d.date, underline: true },
+        { text: `Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.c.Pigeons} pigeons, ${d.c.Mynas} mynas, ${d.c.Crows} crows, ${d.c.Chickens} chickens` },
+      ],
+
+      // Short factual recap fed to the AI so it never has to guess the numbers
+      countSummary: (d) => `${d.c.Pigeons} pigeons, ${d.c.Mynas} mynas, ${d.c.Crows} crows, ${d.c.Chickens} chickens`,
+
+      notesLabel: 'Observation Notes',
+      notesPlaceholder: 'Describe what was observed during this shift…',
+      notesBrief: 'Cover the counts, where the birds were and what they were doing, and whether any feeding, food remains or litter was present. Do not narrate arriving or leaving.',
+      notesExamples: `Below are observation notes from OB logs that were submitted and accepted. Match this voice — the sentence rhythm, the hedging, the level of detail, the plainness.
+
+<example>
+I saw a total of about 14 pigeons, 3 mynas, 2 crows, and 5 chickens in the area. During my entire observation period, I did not witness any active feeding behaviour by any of the birds.
+
+All the birds were gathered and relaxing at the grass patch in front of Block 22A multi-storey carpark. Based on my observations, this location and the grass patch at Block 60 facing Block 22A appear to be the birds' preferred gathering areas even when not actively feeding.
+</example>
+
+<example>
+I saw about 9 pigeons gathered at the same location where they were congregating on day 2. Prayer food was present again at the site, though the birds were not observed feeding on it.
+
+In addition to the pigeons, I counted 4 mynas, 2 crows, and 3 chickens in the area. The pigeons remained in their same spot as day 2 despite the availability of the prayer food.
+</example>
+
+<example>
+I saw prayers were already underway at the area. While no dedicated bird feeder was seen, I noted that the birds present were actively feeding on prayer food.
+
+During this period, I counted a total of 17 pigeons, 4 mynas, 2 crows, and 4 chickens in the vicinity. The birds were just all gathered at the prayer food this day.
+</example>
+
+<example>
+I remained in the area and did not go into the insides of the estate, as I was specifically monitoring for the group of students referenced in the excel spreadsheet. However, neither the students nor any bird activity was observed during this period. My bird count for the shift recorded zero pigeons, zero mynas, zero crows, and zero chickens across the entire observation area. Saw 1 piece of litter.
+</example>
+
+<example>
+I did not see the students during this shift, but as I walked around the block I noticed a significant gathering of birds further down the area near block 41. Upon closer inspection, I saw food waste scattered about, including waste in the drain and what appeared to be two pieces of vegetables lying on the grass. The was about 17 pigeons, 5 mynas, 3 crows, and 4 chickens.
+
+The litter situation at block 41 was worse compared to block 32. Block 41 appeared considerably dirtier overall, which I believe is directly contributing to the higher bird activity in that zone.
+</example>
+
+<example>
+I saw the birds gathered in the sheltered walkway at Block 391 that leads toward the carpark, and they all appeared to be waiting for something. The saw about 12 pigeons, 2 mynas, and 1 crow, with no chickens sighted.
+
+As I was walking around Blk 391, all the birds suddenly took flew and moved to Block 390. When I got there, I found them all feeding on what appeared to be half a slice of bread lying on the ground. I could not determine whether this bread came from an irresponsible resident disposing of waste or from someone deliberately feeding the birds, but the presence of this food source was clearly what had drawn the group over.
+</example>
+
+<example>
+I saw about 5 pigeons, 2 mynas, and 1 crow in the area, with no chickens sighted. I did not observe any feeding activity throughout the duration of my patrol.
+</example>
+
+House rules drawn from the examples above:
+- State counts hedged — "about 14 pigeons", not an exact-sounding figure. A species with none is "no chickens sighted" or "0 mynas".
+- One or two short paragraphs. On a quiet shift a single short paragraph is correct — do not pad.
+- Say where the birds actually were, and account for litter or food sources, including saying plainly when there were none.
+- Hedge where you are unsure: "appeared to be", "I could not determine whether", "based on my observations".
+- Refer back to earlier days when it is relevant ("same spot as day 2", "compared to the previous day").
+- Plain words only. Never use "furthermore", "moreover", "additionally", "notably", or "it is worth noting".
+- Do not over-polish. The examples are typed the way a working officer types, and some sentences are loose or slightly ungrammatical — that is correct and is accepted as submitted. Keep the writing plain and a little informal; do not smooth it into corporate or press-release prose. This applies to the officer's own rough notes too: tidy them only as far as the examples are tidy, and leave their wording alone where it already reads like the examples.`,
+
+      summaryFields: [
+        {
+          key: 'animalBehaviour',
+          formLabel: 'Animal Behaviour Displayed',
+          rowLabel: 'Animal behaviour displayed:',
+          rows: 5,
+          ai: true,
+          useNotes: true,
+          brief: 'Compare the days against each other and say what the birds appeared to be doing. Keep it to one short paragraph in the same voice as the examples.',
+          default: 'Pigeons were observed perching along the ledges and sheltered overhangs of the activation site throughout the surveillance period. Occasional cooing was noted intermittently. Birds were seen foraging along the ground level near refuse collection areas. No aggressive or unusual behaviour was observed. Bird activity remained relatively consistent throughout the shifts with no significant changes noted. No deliberate feeding activity by any member of public was observed throughout the entire surveillance.',
+          examples: `Below are "Animal behaviour displayed" entries from OB logs that were submitted and accepted. Match this voice and this length.
+
+<example>
+Pigeons were all gathering at the same area on all 3 days but on day 2 there were barely any pigeons at that same spot. They seem to be waiting on all 3 days because even after feeding on the bread on day 1 they flew back to the same spot.
+</example>
+
+<example>
+Barely any birds around Blk 32. The birds were more populated at Blk 41 and were feeding on the irresponsibly discarded food waste and the other scraps of litter found in the area.
+</example>
+
+<example>
+The birds were seen feeding on the prayer food on day 1 but on days 2 and 3 they seemed to be either waiting around or just relaxing at their regular spot.
+</example>
+
+House rules drawn from the examples above:
+- Short. One paragraph, one to three sentences. Never longer. Do not pad it out to fill the box.
+- Third person — no "I". This box is not written in first person, unlike the daily observation notes.
+- Compare the days against each other. That contrast is the substance of this box: which day differed, where the birds moved, whether feeding happened on some days and not others.
+- Say what the birds appeared to be doing and offer the plain reading of it — waiting, relaxing, gathering, feeding — hedged with "seem to be" or "seemed to be".
+- Name the specific spot or block when you know it, using the officer's own wording ("Blk 41", "their regular spot", "the same spot").
+- Plain and blunt. Sentence fragments like "Barely any birds around Blk 32." are correct. Do not smooth this into formal report prose, and never use "furthermore", "moreover", "additionally", "notably", or "throughout the surveillance period".`,
+        },
+        {
+          key: 'possibleHabitats',
+          formLabel: 'Possible Habitats of the Animals',
+          rowLabel: 'Possible habitats of the animals:',
+          rows: 4, ai: true,
+          brief: 'Return EXACTLY 3 numbered points (1. 2. 3.). Each point is one short line. No intro sentence, no header, no paragraph text — only the 3 numbered points, nothing else before or after.',
+          default: '1. Ledges and overhangs along the external facade of the building structure\n2. Surrounding mature trees along the perimeter of the activation site\n3. Sheltered areas near the rubbish collection point',
+        },
+        {
+          key: 'foodSources',
+          formLabel: 'Availability of Food Sources / Evidence of Feeding or Littering',
+          rowLabel: 'Availability of food sources, including any evidence of feeding or littering:',
+          rows: 4, ai: true,
+          brief: 'Describe food remnants, refuse areas, note if no deliberate feeders found.',
+          default: 'Scattered food remnants and general litter were observed near the refuse collection area and along the ground level of the outer perimeter. Birds were observed foraging on these food remnants. No deliberate food sources or evidence of active feeding by any person were found. As such, no feeders were sighted throughout the entire surveillance period.',
+        },
+        {
+          key: 'environment',
+          formLabel: 'Environment (Buildings, Trees, Terrain)',
+          rowLabel: 'The environment, including buildings, trees and terrain:',
+          rows: 3, ai: true, prefixLocation: true,
+          brief: 'Describe type of building, surroundings, weather.',
+          default: 'The activation site is a hawker centre / residential block surrounded by trees and walkways. Surveillance was conducted along the outer perimeter and immediate vicinity of the location. Weather conditions were clear throughout the shift.',
+        },
+        {
+          key: 'petOwners',
+          formLabel: 'Behaviours of Pet Owners and Pets',
+          rowLabel: 'Behaviours of pet owners and pets, including but not limited to allowing pets to be unleashed or defecate in public, barking or smell.',
+          rows: 2, ai: false,
+          default: 'Nil',
+        },
+        {
+          key: 'interactions',
+          formLabel: 'Interaction with Feedback Provider / Public / Agencies',
+          rowLabel: 'Any interaction with the feedback provider, members of the public and/or other agencies',
+          rows: 2, ai: false,
+          default: 'Nil',
+        },
+      ],
+    },
+
+    // ────────────────────────────────────────────────────────────── DOGS ────
+    dog: {
+      label: 'Unleashed Dogs / Noise',
+      defaultStart: '16:30',
+      defaultEnd: '19:30',
+      hint: 'Leashing surveillance. The report turns on public area (an offence) vs private property (out of scope). Notes are written in hourly blocks.',
+      showActivationType: false,
+      hourly: true,
+
+      briefTitle: 'Monitoring of Unleashed Dog(s) and Noise',
+      briefSubtitle: '',
+      briefPoints: [
+        'Take CLEAR video of dog owners with any unleashed dog/dogs discreetly.',
+        'Take note of the time and exact venue when unleashed dog(s) was seen.',
+        'After capturing the video, inform owners NICELY that it is an offence to not leash the dog in public areas, inform the owners to leash the dog.',
+        'If found dog owners with unleashed dog/unmuzzled scheduled breed dog, provide them with the leashing advisory.',
+        null, // replaced at build time by the case-specific instruction from Card 1
+        'Do not engage the public. If they have any feedback or queries, refer them to contact NParks via the online feedback page or through the OneService App.',
+        'If they insist to speak to NParks immediately, refer them to contact the call centre at 1800 476 1600.',
+      ],
+      // The activation brief carries one instruction unique to each case. Point 5
+      // above is a placeholder filled from this field.
+      briefCustom: {
+        label: 'Case-specific instruction from the activation brief',
+        placeholder: 'e.g. Keep a lookout for an owner walking a border collie unleashed along Bin Tong Park and Leedon Park. Pet owner has been seen walking between 5pm to 7pm.',
+      },
+
+      counts: [
+        { key: 'Leashed',    label: 'Leashed dogs'   },
+        { key: 'Unleashed',  label: 'Unleashed dogs' },
+        { key: 'Advisories', label: 'Advisories given' },
+      ],
+      texts: [
+        { key: 'Others', label: 'Other animals sighted', placeholder: 'e.g. 1 cat' },
+        { key: 'Remark', label: 'Summary-table remark (optional)', placeholder: 'e.g. Border collie in the brief was sighted and was leashed' },
+      ],
+
+      summaryTableTitle: 'SURVEILLANCE OBSERVATIONS',
+      detailsTableTitle: 'OBSERVATION DETAILS',
+      completedLine: 'Completed Surveillance.',
+      photoDayPrefix: true,
+      dateStyle: 'short',
+      attachments: [
+        'Pictures taken minimally at 15-minute intervals.',
+        'Photographic, video and/or documented evidence, with date and time stamps, submitted to NParks as proof of above surveillance observations.',
+      ],
+
+      sighting: (d, i) => {
+        const bits = [];
+        bits.push(`${d.c.Leashed} leashed dog${d.c.Leashed === '1' ? '' : 's'}`);
+        if (d.c.Unleashed && d.c.Unleashed !== '0') bits.push(`${d.c.Unleashed} unleashed dog${d.c.Unleashed === '1' ? '' : 's'}`);
+        if (d.t.Others) bits.push(d.t.Others);
+        const sighted = (d.c.Leashed === '0' && (!d.c.Unleashed || d.c.Unleashed === '0') && !d.t.Others)
+          ? '0 dogs sighted.'
+          : `${bits.join(' and ')} sighted.`;
+        return [{
+          text: `Day ${i + 1} (${fmtDateShort(d.dateRaw)}) – Time: ${fmtTime(d.start)}–${fmtTime(d.end)} ${sighted}${d.t.Remark ? ' ' + d.t.Remark : ''}`,
+        }];
+      },
+
+      countSummary: (d) =>
+        `${d.c.Leashed} leashed dogs, ${d.c.Unleashed} unleashed dogs in public areas, ${d.c.Advisories} advisories distributed` +
+        (d.t.Others ? `, other animals sighted: ${d.t.Others}` : ''),
+
+      notesLabel: 'Observation Notes',
+      notesPlaceholder: 'Rough notes for this hour…',
+      notesBrief: 'Say where you patrolled in this hour and what you saw. Always state whether any unleashed dogs were seen in public areas and whether advisories were distributed.',
+      // Only one dog report exists so far — add more examples here as they come in.
+      notesExamples: `Below are hourly observation blocks from a dog OB log that was submitted and accepted. Match this voice and this length. The time range is added automatically, so do not write it yourself.
+
+<example>
+Arrived at Leedon Park and did my rounds. 4 leashed dogs and 1 cat sighted in the area. The border collie specified in the activation brief was sighted and confirmed to be leashed by its owner. No unleashed dogs observed in public areas. No advisories distributed.
+</example>
+
+<example>
+continued across Leedon Park and connecting route towards Bin Tong Park. No unleashed dogs observed. No other observation.
+</example>
+
+<example>
+continued rounds at Bin Tong Park and Leedon Park areas. No unleashed dogs observed in public areas. No other observations. Ended surveillance at 1930 hrs.
+</example>
+
+<example>
+Arrived at Bin Tong Park and did rounds. Bin Tong Park was relatively less active in terms of dog activity compared to Leedon Park. No dogs sighted. Quite a bit of mosquitoes in Bin Tong. No unleashed dogs observed. No advisories distributed.
+</example>
+
+<example>
+Continued rounds. Dogs within private residential compounds observed unleashed only within private property. No unleashed dogs in public areas sighted. No other observation.
+</example>
+
+House rules drawn from the examples above:
+- Two to five short sentences for the block. Never a wall of text.
+- The FIRST block of a day opens with arriving ("Arrived at Leedon Park and did my rounds."). Later blocks open with continuing ("Continued rounds.", "continued across Leedon Park and connecting route towards Bin Tong Park."). The LAST block of a day ends with "Ended surveillance at [end time] hrs."
+- Nearly every block states whether unleashed dogs were seen in public areas, and the first block states whether advisories were distributed. Say it plainly even when the answer is none.
+- Keep the public-versus-private distinction exact. A dog off its leash inside a private residential compound is NOT an offence — write it the way the examples do: "observed unleashed only within private property", "which is within private property and outside the scope of public area surveillance". Never imply an offence occurred on private land.
+- Incidental observations belong in the block if the officer noted them ("Quite a bit of mosquitoes in Bin Tong.").
+- Plain and a little informal. Do not smooth this into corporate prose, and never use "furthermore", "moreover", "additionally" or "notably".`,
+
+      summaryFields: [
+        {
+          key: 'animalBehaviour',
+          formLabel: 'Animal Behaviour Displayed',
+          rowLabel: 'Animal behaviour displayed:',
+          rows: 5, ai: true, useNotes: true,
+          brief: 'Summarise across all the days: whether dogs in public areas were leashed, whether any aggression was seen, and the private-property position. Mention any animal named in the activation brief.',
+          default: '',
+          examples: `Below is an "Animal behaviour displayed" entry from a dog OB log that was submitted and accepted. Match this voice and this length.
+
+<example>
+All dogs encountered in public areas were leashed across all three days. No aggressive behaviour observed. Dogs within private residential compounds were observed unleashed, which is within private property and outside the scope of public area surveillance. The border collie specified in the activation brief was sighted on Day 1 and was leashed.
+</example>
+
+House rules:
+- Three to four sentences, one paragraph, third person — no "I".
+- Cover, in this order: leashed status in public areas across the days, whether any aggressive behaviour was seen, the private-property position, and any animal named in the activation brief.
+- State the public/private distinction exactly as the example does. Never imply an offence occurred on private property.
+- Plain report prose. No "furthermore", "moreover", "additionally", "notably".`,
+        },
+        {
+          key: 'possibleHabitats',
+          formLabel: 'Possible Habitats of the Animals',
+          rowLabel: 'Possible habitats of the animals:',
+          rows: 2, ai: true,
+          brief: 'One single line only — a comma-separated list of the places, ending in a full stop. Not numbered points, not a paragraph.',
+          default: '',
+        },
+        {
+          key: 'foodSources',
+          formLabel: 'Availability of Food Sources / Evidence of Feeding or Littering',
+          rowLabel: 'Availability of food sources, including any evidence of feeding or littering:',
+          rows: 2, ai: true,
+          brief: 'One short sentence. On a dog activation this is almost always a plain negative.',
+          default: 'No food sources or evidence of feeding sighted.',
+        },
+        {
+          key: 'environment',
+          formLabel: 'Environment (Buildings, Trees, Terrain)',
+          rowLabel: 'The environment, including buildings, trees and terrain:',
+          rows: 4, ai: true,
+          brief: 'Describe the terrain and surroundings, how the patrol areas relate to each other, and the weather across the shifts. Three to four sentences.',
+          default: '',
+        },
+        {
+          key: 'petOwners',
+          formLabel: 'Behaviours of Pet Owners and Pets',
+          rowLabel: 'Behaviours of pet owners and pets, including but not limited to allowing pets to be unleashed or defecate in public, barking or smell.',
+          rows: 3, ai: true,
+          brief: 'One or two sentences on whether owners leashed their dogs in public areas across the days, and the private-property position.',
+          default: '',
+          examples: `Below is a "Behaviours of pet owners and pets" entry from a dog OB log that was submitted and accepted.
+
+<example>
+All dogs observed in public areas were leashed by their owners across all three days. Dogs sighted within private residential compounds were unleashed but within private property.
+</example>
+
+House rules: one or two sentences, third person, plain. Keep the public/private distinction exact — never imply an offence occurred on private property.`,
+        },
+        {
+          key: 'interactions',
+          formLabel: 'Interaction with Feedback Provider / Public / Agencies',
+          rowLabel: 'Any interaction with the feedback provider, members of the public and/or other agencies',
+          rows: 2, ai: true,
+          brief: 'Start with "Nil." if nobody was engaged, then one short sentence saying why — typically that no unleashed dogs were encountered and no advisories were distributed.',
+          default: 'Nil.',
+          examples: `Below is an "Any interaction" entry from a dog OB log that was submitted and accepted.
+
+<example>
+Nil. No unleashed dogs in public areas encountered. No advisories distributed.
+</example>
+
+House rules: begin with "Nil." when nobody was engaged, then state plainly why in one short sentence. Never pad it.`,
+        },
+      ],
+    },
+  };
+
+  // Currently selected case type. Everything reads through caseType().
+  let currentCaseType = 'bird';
+  function caseType() { return CASE_TYPES[currentCaseType]; }
+
+  // ── Case-type driven form rendering ───────────────────────────────────────
+  function hhmm(mins) {
+    const h = Math.floor(mins / 60) % 24, m = mins % 60;
+    return String(h).padStart(2, '0') + String(m).padStart(2, '0');
+  }
+
+  // Split a shift into one-hour blocks. A trailing part-hour becomes its own
+  // short block so the last block always ends at the real shift end time.
+  function hourBlocks(start, end) {
+    if (!start || !end) return [];
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    let from = sh * 60 + sm;
+    const to = eh * 60 + em;
+    if (!(to > from)) return [];
+    const out = [];
+    while (from < to && out.length < 12) {
+      const next = Math.min(from + 60, to);
+      out.push({ from: hhmm(from), to: hhmm(next), label: `${hhmm(from)}–${hhmm(next)} hrs` });
+      from = next;
+    }
+    return out;
+  }
+
+  function initCaseTypes() {
+    const sel = document.getElementById('caseType');
+    sel.innerHTML = Object.entries(CASE_TYPES)
+      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+    sel.value = currentCaseType;
+    applyCaseType(false);
+  }
+
+  function onCaseTypeChange() {
+    currentCaseType = document.getElementById('caseType').value;
+    applyCaseType(true);
+  }
+
+  function applyCaseType(reset) {
+    const t = caseType();
+    document.getElementById('caseTypeHint').textContent = t.hint;
+    document.getElementById('activationTypeGroup').style.display = t.showActivationType ? '' : 'none';
+    renderBriefCustom();
+    renderDays(reset);
+    renderSummary(reset);
+  }
+
+  function renderBriefCustom() {
+    const t = caseType();
+    const wrap = document.getElementById('briefCustomWrap');
+    const prev = document.getElementById('briefCustom');
+    const keep = prev ? prev.value : '';
+    if (!t.briefCustom) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<div class="form-group span2">
+      <label>${t.briefCustom.label}</label>
+      <textarea id="briefCustom" rows="2" placeholder="${t.briefCustom.placeholder}"></textarea>
+      <p class="hint">Goes in as point 5 of the surveillance brief. Leave blank to omit that point.</p>
+    </div>`;
+    document.getElementById('briefCustom').value = keep;
+  }
+
+  function renderDays(reset) {
+    const t = caseType();
+    const saved = {};
+    document.querySelectorAll('#daysContainer input, #daysContainer textarea')
+      .forEach(el => { if (el.id) saved[el.id] = el.value; });
+
+    const cols = 3 + t.counts.length;
+    let html = '';
+    for (let n = 1; n <= 3; n++) {
+      html += `<div class="day-section">
+        <div class="day-header">Day ${n}${n > 1 ? ' <span style="font-weight:400;color:#888;">(optional)</span>' : ''}</div>
+        <div class="day-grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr));">
+          <div class="form-group"><label>Date</label><input type="date" id="day${n}Date" /></div>
+          <div class="form-group"><label>Start Time</label><input type="time" id="day${n}Start" value="${t.defaultStart}" onchange="autoEndTime(${n})" /></div>
+          <div class="form-group"><label>End Time</label><input type="time" id="day${n}End" value="${t.defaultEnd}" onchange="renderNotes(${n})" /></div>`;
+      t.counts.forEach(c => {
+        html += `<div class="form-group"><label>${c.label}</label><input type="number" id="day${n}${c.key}" min="0" value="0" /></div>`;
+      });
+      html += `</div>`;
+      if (t.texts.length) {
+        html += `<div class="grid g2" style="margin-top:8px;">`;
+        t.texts.forEach(x => {
+          html += `<div class="form-group"><label>${x.label}</label><input type="text" id="day${n}${x.key}" placeholder="${x.placeholder || ''}" /></div>`;
+        });
+        html += `</div>`;
+      }
+      html += `<div id="day${n}NotesWrap" style="margin-top:12px;"></div>
+        <div class="day-photo-wrap">
+          <label class="btn-day-photo" for="day${n}ObsPhotos">📷 Add Photos to Observation</label>
+          <input type="file" id="day${n}ObsPhotos" multiple accept="image/*" style="display:none" onchange="handleDayPhoto(${n}, this.files)" />
+          <div id="day${n}PhotoThumbs" class="day-thumbs"></div>
+        </div>
+      </div>`;
+      if (n < 3) html += `<hr class="divider" />`;
+    }
+    document.getElementById('daysContainer').innerHTML = html;
+
+    // Carry over anything the officer already typed. On a type change the shift
+    // times are deliberately NOT carried — a dog patrol runs at different hours.
+    Object.keys(saved).forEach(id => {
+      if (reset && /(Start|End)$/.test(id)) return;
+      const el = document.getElementById(id);
+      if (el) el.value = saved[id];
+    });
+    for (let n = 1; n <= 3; n++) { renderNotes(n); renderDayThumbs(n); }
+  }
+
+  function renderNotes(n) {
+    const t = caseType();
+    const wrap = document.getElementById(`day${n}NotesWrap`);
+    if (!wrap) return;
+
+    if (!t.hourly) {
+      const prev = document.getElementById(`day${n}Notes`);
+      const keep = prev ? prev.value : '';
+      wrap.innerHTML = `<div class="form-group">
+        <label class="label-row">Day ${n} ${t.notesLabel}
+          <button class="btn-ai" onclick="generateDayNotes(${n}, this)">✦ Generate</button>
+        </label>
+        <textarea id="day${n}Notes" rows="4" placeholder="${t.notesPlaceholder}"></textarea>
+      </div>`;
+      document.getElementById(`day${n}Notes`).value = keep;
+      return;
+    }
+
+    const keep = {};
+    wrap.querySelectorAll('textarea').forEach(el => { keep[el.id] = el.value; });
+    const blocks = hourBlocks(
+      document.getElementById(`day${n}Start`).value,
+      document.getElementById(`day${n}End`).value,
+    );
+    let html = `<label class="label-row" style="margin-bottom:4px;">Day ${n} ${t.notesLabel}
+      <button class="btn-ai" onclick="generateDayNotes(${n}, this)">✦ Generate all blocks</button>
+    </label>`;
+    if (!blocks.length) {
+      html += `<p class="hint">Set the start and end times to lay out the hourly blocks.</p>`;
+    } else {
+      blocks.forEach((b, i) => {
+        html += `<div class="hour-block">
+          <span class="hour-block-label">${b.label}</span>
+          <textarea id="day${n}Block${i}" rows="2" placeholder="${t.notesPlaceholder}"></textarea>
+        </div>`;
+      });
+    }
+    wrap.innerHTML = html;
+    blocks.forEach((b, i) => {
+      const el = document.getElementById(`day${n}Block${i}`);
+      if (el && keep[el.id] !== undefined) el.value = keep[el.id];
+    });
+  }
+
+  function renderSummary(reset) {
+    const t = caseType();
+    const keep = {};
+    document.querySelectorAll('#summaryContainer textarea').forEach(el => { keep[el.id] = el.value; });
+    document.getElementById('summaryContainer').innerHTML = t.summaryFields.map(f => `
+      <div class="form-group">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
+          <label style="margin-bottom:0;">${f.formLabel}</label>
+          ${f.ai ? `<button class="btn-ai" onclick="generateSection('${f.key}', this)">✦ Generate</button>` : ''}
+        </div>
+        <textarea id="${f.key}" rows="${f.rows}"></textarea>
+      </div>`).join('');
+    t.summaryFields.forEach(f => {
+      const el = document.getElementById(f.key);
+      el.value = (!reset && keep[f.key] !== undefined) ? keep[f.key] : f.default;
+    });
+  }
+
+  // Single source of truth for reading the days out of the form. Every consumer
+  // — preview, .docx, and the AI prompts — goes through this.
+  function collectDays() {
+    const t = caseType();
+    const out = [];
+    for (let i = 1; i <= 3; i++) {
+      const el = document.getElementById(`day${i}Date`);
+      const dateRaw = el ? el.value : '';
+      if (!dateRaw) continue;
+      const start = document.getElementById(`day${i}Start`).value;
+      const end   = document.getElementById(`day${i}End`).value;
+      const c = {}, tx = {};
+      t.counts.forEach(k => {
+        const f = document.getElementById(`day${i}${k.key}`);
+        c[k.key] = (f && f.value) ? f.value : '0';
+      });
+      t.texts.forEach(k => {
+        const f = document.getElementById(`day${i}${k.key}`);
+        tx[k.key] = f ? f.value.trim() : '';
+      });
+      const blocks = t.hourly
+        ? hourBlocks(start, end).map((b, bi) => {
+            const f = document.getElementById(`day${i}Block${bi}`);
+            return { ...b, text: f ? f.value.trim() : '' };
+          })
+        : [];
+      const notes = t.hourly
+        ? blocks.filter(b => b.text).map(b => `${b.label} ${b.text}`).join('\n\n')
+        : (() => { const f = document.getElementById(`day${i}Notes`); return f ? f.value.trim() : ''; })();
+      out.push({ idx: i, dateRaw, date: fmtDate(dateRaw), start, end, c, t: tx, blocks, notes });
+    }
+    return out;
+  }
+
   // ── fast game ──────────────────────────────────────────────────────────────
   function openFastGame() {
     document.getElementById('fastGameOverlay').classList.add('open');
@@ -900,30 +1319,31 @@
     btn.disabled = true;
     btn.textContent = '⏳ Parsing…';
 
-    const system = `You are a data parser for an NParks Singapore bird surveillance report system.
+    const t = caseType();
+    const dayKeys = [
+      ...t.counts.map(c => `${c.key.toLowerCase()}: number`),
+      ...t.texts.map(x  => `${x.key.toLowerCase()}: string`),
+    ].join(', ');
+    const system = `You are a data parser for an NParks Singapore ${t.label} surveillance report system.
 Extract structured data from the user's free-form text and return ONLY a valid JSON object — no explanation, no markdown, no code fences.
-Current year: 2026.
+Current year: ${new Date().getFullYear()}.
 
 Fields to extract (only include fields clearly mentioned):
 - caseId: string
-- location: string
-- activationType: "Urgent" or "Non-Urgent"
+- location: string${t.showActivationType ? '\n- activationType: "Urgent" or "Non-Urgent"' : ''}
 - activatingOfficer: string
 - activationDate: YYYY-MM-DD
 - officerName: string (only "Vinith Kumar", "Bhavana Krishna", or "Tharish Kumar" if recognisable)
-- days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", pigeons: number, mynas: number, crows: number, chickens: number, notes: string }
-- animalBehaviour: string
-- possibleHabitats: string
-- foodSources: string
-- environment: string
+- days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", ${dayKeys}, notes: string }
+${t.summaryFields.map(f => `- ${f.key}: string`).join('\n')}
 
 Time parsing rules:
 - "1130" or "11:30am" or "11.30am" → "11:30"
 - "1430" or "2:30pm" or "2.30pm" → "14:30"
 - "2pm" → "14:00", "11am" → "11:00"
 Date parsing rules:
-- Dates without year: assume 2026
-- "21 may" → "2026-05-21"
+- Dates without year: assume ${new Date().getFullYear()}
+- "21 may" → "${new Date().getFullYear()}-05-21"
 Return ONLY the JSON object.`;
 
     try {
@@ -950,29 +1370,31 @@ Return ONLY the JSON object.`;
   }
 
   function fillFromParsed(d) {
-    const setField = (id, v) => { if (v !== undefined && v !== null && v !== '') document.getElementById(id).value = v; };
+    const t = caseType();
+    const setField = (id, v) => {
+      if (v === undefined || v === null || v === '') return;
+      const el = document.getElementById(id);
+      if (el) el.value = v;
+    };
     setField('caseId',            d.caseId);
     setField('location',          d.location);
     setField('activatingOfficer', d.activatingOfficer);
     setField('activationDate',    d.activationDate);
-    if (d.activationType) document.getElementById('activationType').value = d.activationType;
+    if (d.activationType && t.showActivationType) document.getElementById('activationType').value = d.activationType;
     if (d.officerName)  { document.getElementById('officerName').value = d.officerName; fillOfficerHP(); }
-    setField('animalBehaviour',  d.animalBehaviour);
-    setField('possibleHabitats', d.possibleHabitats);
-    setField('foodSources',      d.foodSources);
-    setField('environment',      d.environment);
+    t.summaryFields.forEach(f => setField(f.key, d[f.key]));
 
     if (Array.isArray(d.days)) {
       d.days.slice(0, 3).forEach((day, i) => {
         const n = i + 1;
-        setField(`day${n}Date`,    day.date);
-        setField(`day${n}Start`,   day.start);
-        setField(`day${n}End`,     day.end);
-        setField(`day${n}Notes`,   day.notes);
-        if (day.pigeons   !== undefined) setField(`day${n}Pigeons`,   day.pigeons);
-        if (day.mynas     !== undefined) setField(`day${n}Mynas`,     day.mynas);
-        if (day.crows     !== undefined) setField(`day${n}Crows`,     day.crows);
-        if (day.chickens  !== undefined) setField(`day${n}Chickens`,  day.chickens);
+        setField(`day${n}Date`,  day.date);
+        setField(`day${n}Start`, day.start);
+        setField(`day${n}End`,   day.end);
+        // Times may have changed, so re-lay the hourly blocks before filling notes.
+        if (t.hourly) renderNotes(n);
+        setField(`day${n}Notes`, day.notes);
+        t.counts.forEach(c => setField(`day${n}${c.key}`, day[c.key.toLowerCase()]));
+        t.texts.forEach(x  => setField(`day${n}${x.key}`, day[x.key.toLowerCase()]));
       });
     }
   }
@@ -1004,6 +1426,7 @@ Return ONLY the JSON object.`;
     const [h, m] = startEl.value.split(':').map(Number);
     const total  = h * 60 + m + 180; // +3 hours
     endEl.value  = `${String(Math.floor(total / 60) % 24).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}`;
+    renderNotes(day); // hourly blocks follow the shift length
   }
 
   function fillOfficerHP() {
@@ -1013,6 +1436,8 @@ Return ONLY the JSON object.`;
 
   // ── helpers ────────────────────────────────────────────────────────────────
   function val(id) { return document.getElementById(id).value.trim(); }
+  // Same as val(), but for fields that only exist on some case types.
+  function optVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
   function raw(id) { return document.getElementById(id).value; }
 
   const MONTHS = ['January','February','March','April','May','June',
@@ -1022,6 +1447,18 @@ Return ONLY the JSON object.`;
     if (!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
     return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  // "2 Aug 2026" — dog reports abbreviate the month, bird reports spell it out.
+  function fmtDateShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T00:00:00');
+    return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
+  }
+
+  // Whichever style the current case type calls for.
+  function fmtDateFor(dateStr) {
+    return caseType().dateStyle === 'short' ? fmtDateShort(dateStr) : fmtDate(dateStr);
   }
 
   function fmtTime(t) {
@@ -1126,6 +1563,9 @@ Return ONLY the JSON object.`;
     const cy = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
     return { x: cx / canvas.width, y: cy / canvas.height };
   }
+
+  // Build the case-type dropdown and render Cards 3 and 4 for the default type.
+  document.addEventListener('DOMContentLoaded', initCaseTypes);
 
   document.addEventListener('DOMContentLoaded', function attachAnnotEvents() {
     const canvas = document.getElementById('annotateCanvas');
@@ -1424,188 +1864,126 @@ Return ONLY the JSON object.`;
     }
   }
 
-  // ── House style ────────────────────────────────────────────────────────────
-  // Real observation notes from submitted-and-accepted OB logs, reproduced VERBATIM
-  // including their loose grammar. These teach the model the officer's actual voice;
-  // describing the style in prose does not work nearly as well. Do not "correct" the
-  // examples — the slightly unpolished writing is what makes the output read as a
-  // human field note rather than a press release, and NParks accepts it as-is.
-  // Add or swap examples here to shift the house style.
-  const OB_STYLE_EXAMPLES = `Below are observation notes from OB logs that were submitted and accepted. Match this voice — the sentence rhythm, the hedging, the level of detail, the plainness.
-
-<example>
-I saw a total of about 14 pigeons, 3 mynas, 2 crows, and 5 chickens in the area. During my entire observation period, I did not witness any active feeding behaviour by any of the birds.
-
-All the birds were gathered and relaxing at the grass patch in front of Block 22A multi-storey carpark. Based on my observations, this location and the grass patch at Block 60 facing Block 22A appear to be the birds' preferred gathering areas even when not actively feeding.
-</example>
-
-<example>
-I saw about 9 pigeons gathered at the same location where they were congregating on day 2. Prayer food was present again at the site, though the birds were not observed feeding on it.
-
-In addition to the pigeons, I counted 4 mynas, 2 crows, and 3 chickens in the area. The pigeons remained in their same spot as day 2 despite the availability of the prayer food.
-</example>
-
-<example>
-I saw prayers were already underway at the area. While no dedicated bird feeder was seen, I noted that the birds present were actively feeding on prayer food.
-
-During this period, I counted a total of 17 pigeons, 4 mynas, 2 crows, and 4 chickens in the vicinity. The birds were just all gathered at the prayer food this day.
-</example>
-
-<example>
-I remained in the area and did not go into the insides of the estate, as I was specifically monitoring for the group of students referenced in the excel spreadsheet. However, neither the students nor any bird activity was observed during this period. My bird count for the shift recorded zero pigeons, zero mynas, zero crows, and zero chickens across the entire observation area. Saw 1 piece of litter.
-</example>
-
-<example>
-I did not see the students during this shift, but as I walked around the block I noticed a significant gathering of birds further down the area near block 41. Upon closer inspection, I saw food waste scattered about, including waste in the drain and what appeared to be two pieces of vegetables lying on the grass. The was about 17 pigeons, 5 mynas, 3 crows, and 4 chickens.
-
-The litter situation at block 41 was worse compared to block 32. Block 41 appeared considerably dirtier overall, which I believe is directly contributing to the higher bird activity in that zone.
-</example>
-
-<example>
-I saw the birds gathered in the sheltered walkway at Block 391 that leads toward the carpark, and they all appeared to be waiting for something. The saw about 12 pigeons, 2 mynas, and 1 crow, with no chickens sighted.
-
-As I was walking around Blk 391, all the birds suddenly took flew and moved to Block 390. When I got there, I found them all feeding on what appeared to be half a slice of bread lying on the ground. I could not determine whether this bread came from an irresponsible resident disposing of waste or from someone deliberately feeding the birds, but the presence of this food source was clearly what had drawn the group over.
-</example>
-
-<example>
-I saw about 5 pigeons, 2 mynas, and 1 crow in the area, with no chickens sighted. I did not observe any feeding activity throughout the duration of my patrol.
-</example>
-
-House rules drawn from the examples above:
-- State counts hedged — "about 14 pigeons", not an exact-sounding figure. A species with none is "no chickens sighted" or "0 mynas".
-- One or two short paragraphs. On a quiet shift a single short paragraph is correct — do not pad.
-- Say where the birds actually were, and account for litter or food sources, including saying plainly when there were none.
-- Hedge where you are unsure: "appeared to be", "I could not determine whether", "based on my observations".
-- Refer back to earlier days when it is relevant ("same spot as day 2", "compared to the previous day").
-- Plain words only. Never use "furthermore", "moreover", "additionally", "notably", or "it is worth noting".
-- Do not over-polish. The examples are typed the way a working officer types, and some sentences are loose or slightly ungrammatical — that is correct and is accepted as submitted. Keep the writing plain and a little informal; do not smooth it into corporate or press-release prose. This applies to the officer's own rough notes too: tidy them only as far as the examples are tidy, and leave their wording alone where it already reads like the examples.
-
-CRITICAL: the examples above come from other cases. The block numbers, locations, prayer food, students, bread and every other specific detail in them belong to those reports, not this one. Never carry a detail from an example into your output. Write only from the shift details you are given, plus what the officer's own rough notes say.`;
-
+  // ── Day observation notes ─────────────────────────────────────────────────
+  // Free-form types get one call. Hourly types (dogs) get one call PER BLOCK, so
+  // the model is never asked to decide which hour something happened in — it only
+  // ever rewrites the block the officer already put that observation in.
   async function generateDayNotes(day, btn) {
+    const t        = caseType();
     const location = val('location') || 'the activation site';
-    const dateRaw  = document.getElementById(`day${day}Date`).value;
-    const date     = fmtDate(dateRaw) || 'the surveillance date';
-    const start    = fmtTime(document.getElementById(`day${day}Start`).value);
-    const end      = fmtTime(document.getElementById(`day${day}End`).value);
-    const pigeons  = document.getElementById(`day${day}Pigeons`).value   || '0';
-    const mynas    = document.getElementById(`day${day}Mynas`).value     || '0';
-    const crows    = document.getElementById(`day${day}Crows`).value     || '0';
-    const chickens = document.getElementById(`day${day}Chickens`).value  || '0';
-
-    const existing = document.getElementById(`day${day}Notes`).value.trim();
+    const days     = collectDays();
+    const d        = days.find(x => x.idx === day);
+    if (!d) { alert('Please fill in the date for Day ' + day + ' first.'); return; }
 
     const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout.
 
 Plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags.
 
-${OB_STYLE_EXAMPLES}`;
+${t.notesExamples}
 
-    const prompt = existing
-      ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.
+CRITICAL: the examples come from other cases. Every place, block number, person, animal and food source in them belongs to those reports, not this one. Never carry a detail from an example into your output — write only from the shift details you are given and the officer's own rough notes.`;
 
-Shift details:
-Location: ${location}, Date: ${date}, Shift: ${start} to ${end}, Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
+    const shift = `Location: ${location}
+Date: ${d.date}
+Shift: ${fmtTime(d.start)} to ${fmtTime(d.end)}
+Counts: ${t.countSummary(d)}`;
 
-Officer's rough notes to rephrase:
-${existing}`
-      : `Write my first-person observation notes for this surveillance shift:
-Location: ${location}
-Date: ${date}
-Shift: ${start} to ${end}
-Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
+    try {
+      if (!t.hourly) {
+        const existing = d.notes;
+        const prompt = existing
+          ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.\n\nShift details:\n${shift}\n\nOfficer's rough notes to rephrase:\n${existing}`
+          : `Write my first-person observation notes for this surveillance shift.\n\n${shift}\n\n${t.notesBrief} Do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
+        const text = await callClaude(system, prompt, btn);
+        document.getElementById(`day${day}Notes`).value = text;
+        return;
+      }
 
-Write as the officer who was there, in the same voice as the examples. Cover the counts, where the birds were and what they were doing, and whether any feeding, food remains or litter was present. Do not narrate arriving or leaving, and do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
+      // Hourly: rewrite each block the officer actually typed, one call each.
+      const filled = d.blocks.map((b, i) => ({ ...b, i })).filter(b => b.text);
+      if (!filled.length) { alert('Type some rough notes into at least one hourly block first.'); return; }
+
+      const orig = btn.textContent;
+      btn.disabled = true;
+      for (let k = 0; k < filled.length; k++) {
+        const b = filled[k];
+        btn.textContent = `⏳ ${k + 1}/${filled.length}…`;
+        const position = b.i === 0
+          ? 'This is the FIRST block of the day, so it opens with arriving on site.'
+          : (b.i === d.blocks.length - 1
+              ? `This is the LAST block of the day, so it ends with "Ended surveillance at ${fmtTime(d.end)}."`
+              : 'This is a middle block of the day, so it opens with continuing the rounds.');
+        const prompt = `Rewrite the officer's rough notes for ONE hourly block into the finished voice of the examples.
+
+${shift}
+This block covers ${b.label}. ${position}
+
+Write the block body only — do NOT write the time range, it is added automatically. ${t.notesBrief} Keep every fact from the rough notes, invent nothing, and do not mention anything from another block.
+
+Officer's rough notes for this block:
+${b.text}`;
+        // callClaude manages the button label, so hand it a stub to leave ours alone.
+        const stub = { disabled: false, textContent: '' };
+        const text = await callClaude(system, prompt, stub);
+        document.getElementById(`day${day}Block${b.i}`).value = text;
+      }
+      btn.textContent = orig;
+      btn.disabled = false;
+      showToast('Hourly blocks rewritten.');
+    } catch (err) {
+      btn.disabled = false;
+      alert('AI generation failed: ' + err.message);
+    }
+  }
+
+  // ── Summary of Observations boxes ─────────────────────────────────────────
+  async function generateSection(field, btn) {
+    const t     = caseType();
+    const spec  = t.summaryFields.find(f => f.key === field);
+    if (!spec || !spec.ai) return;
+
+    const location = val('location') || 'the activation site';
+    const days     = collectDays();
+    if (!days.length) { alert('Please fill in at least Day 1 before generating.'); return; }
+
+    // Boxes flagged useNotes also see what the officer wrote for each day, so they
+    // can describe what actually happened rather than guessing from the counts.
+    const context = days.map((d, i) =>
+      `Day ${i + 1} (${d.date}, ${fmtTime(d.start)}–${fmtTime(d.end)}): ${t.countSummary(d)}` +
+      (spec.useNotes && d.notes ? `\nDay ${i + 1} observation notes written by the officer:\n${d.notes}` : '')
+    ).join('\n\n');
+
+    const brief = optVal('briefCustom');
+    const system = spec.examples
+      ? `You are an NParks Singapore field surveillance officer filling in the "${spec.formLabel}" row of an official government Occurrence Book report. Output plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags. Start directly with content.
+
+${spec.examples}
+
+CRITICAL: the examples come from other cases. Every place, block number, person and animal in them belongs to those reports, not this one. Never carry a detail from an example into your output — write only from the case details given below.`
+      : `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
+
+    const prompt = `Write the "${spec.formLabel}" entry for the surveillance at ${location}.
+${brief ? `\nCase-specific instruction from the activation brief: ${brief}\n` : ''}
+${context}
+
+${spec.brief} Use only what is above — do not invent a block number, food source, person or location that is not stated.`;
 
     try {
       const text = await callClaude(system, prompt, btn);
-      document.getElementById(`day${day}Notes`).value = text;
+      document.getElementById(field).value = text;
     } catch (err) {
       alert('AI generation failed: ' + err.message);
     }
   }
 
-  // ── House style: "Animal behaviour displayed" only ─────────────────────────
-  // Real entries from submitted-and-accepted OB logs, VERBATIM including their loose
-  // grammar and sentence fragments. Note how short they are and that they are built
-  // around comparing the days against each other — that is the whole point of this
-  // box. Do not "correct" these. Only this one summary field uses examples; the other
-  // three boxes are deliberately left on their original generic prompt.
-  const BEHAVIOUR_STYLE_EXAMPLES = `Below are "Animal behaviour displayed" entries from OB logs that were submitted and accepted. Match this voice and this length.
-
-<example>
-Pigeons were all gathering at the same area on all 3 days but on day 2 there were barely any pigeons at that same spot. They seem to be waiting on all 3 days because even after feeding on the bread on day 1 they flew back to the same spot.
-</example>
-
-<example>
-Barely any birds around Blk 32. The birds were more populated at Blk 41 and were feeding on the irresponsibly discarded food waste and the other scraps of litter found in the area.
-</example>
-
-<example>
-The birds were seen feeding on the prayer food on day 1 but on days 2 and 3 they seemed to be either waiting around or just relaxing at their regular spot.
-</example>
-
-House rules drawn from the examples above:
-- Short. One paragraph, one to three sentences. Never longer. Do not pad it out to fill the box.
-- Third person — no "I". This box is not written in first person, unlike the daily observation notes.
-- Compare the days against each other. That contrast is the substance of this box: which day differed, where the birds moved, whether feeding happened on some days and not others.
-- Say what the birds appeared to be doing and offer the plain reading of it — waiting, relaxing, gathering, feeding — hedged with "seem to be" or "seemed to be".
-- Name the specific spot or block when you know it, using the officer's own wording ("Blk 41", "their regular spot", "the same spot").
-- Plain and blunt. Sentence fragments like "Barely any birds around Blk 32." are correct. Do not smooth this into formal report prose, and never use "furthermore", "moreover", "additionally", "notably", or "throughout the surveillance period".
-
-CRITICAL: the examples come from other cases. The block numbers, the bread, the prayer food and the discarded food waste belong to those reports, not this one. Never carry a detail from an example into your output — write only from the shift data and the officer's own daily notes given below.`;
-
-  async function generateSection(field, btn) {
-    const location = val('location') || 'the activation site';
-    const days = [];
-    for (let i = 1; i <= 3; i++) {
-      const dr = document.getElementById(`day${i}Date`).value;
-      if (!dr) continue;
-      days.push({
-        date:    fmtDate(dr),
-        start:   fmtTime(document.getElementById(`day${i}Start`).value),
-        end:     fmtTime(document.getElementById(`day${i}End`).value),
-        pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
-        mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
-        crows:    document.getElementById(`day${i}Crows`).value     || '0',
-        chickens: document.getElementById(`day${i}Chickens`).value  || '0',
-        notes:    document.getElementById(`day${i}Notes`).value.trim(),
-      });
-    }
-    if (!days.length) { alert('Please fill in at least Day 1 before generating.'); return; }
-
-    const daysSummary = days.map((d, i) =>
-      `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens`
-    ).join('\n');
-
-    // Same day-by-day figures, plus the officer's own notes so the behaviour box can
-    // actually compare the days instead of guessing from bird counts alone.
-    const behaviourContext = days.map((d, i) =>
-      `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens` +
-      (d.notes ? `\nDay ${i+1} observation notes written by the officer: ${d.notes}` : '')
-    ).join('\n\n');
-
-    // Only "Animal behaviour displayed" is style-matched to past reports; the other
-    // three boxes keep the original generic prompt and the 2–4 sentence instruction.
-    const system = field === 'animalBehaviour'
-      ? `You are an NParks Singapore field surveillance officer filling in the "Animal behaviour displayed" row of an official government Occurrence Book report. Output plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags. Start directly with content.
-
-${BEHAVIOUR_STYLE_EXAMPLES}`
-      : `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
-
-    const prompts = {
-      animalBehaviour: `Write the "Animal behaviour displayed" entry for the bird surveillance at ${location}.\n\n${behaviourContext}\n\nCompare the days against each other and say what the birds appeared to be doing. Keep it to one short paragraph in the same voice as the examples. Use only what is above — do not invent a block number, food source, person or location that is not stated.`,
-      possibleHabitats: `Write the possible habitats section for a bird surveillance at ${location}.\n${daysSummary}\nReturn EXACTLY 3 numbered points (1. 2. 3.). Each point is one short line. No intro sentence, no header, no paragraph text — only the 3 numbered points, nothing else before or after.`,
-      foodSources: `Write the food sources / evidence of feeding section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe food remnants, refuse areas, note if no deliberate feeders found.`,
-      environment: `Write the environment description for a bird surveillance at ${location}.\n${daysSummary}\nDescribe type of building, surroundings, weather.`,
-    };
-
-    try {
-      const text = await callClaude(system, prompts[field], btn);
-      document.getElementById(field).value = text;
-    } catch (err) {
-      alert('AI generation failed: ' + err.message);
-    }
+  // Surveillance-brief points for the current case type. A `null` entry is the
+  // slot for the case-specific instruction typed in Card 1; if that box is empty
+  // the point is dropped and the rest renumber themselves.
+  function buildBriefPoints() {
+    const custom = optVal('briefCustom');
+    return caseType().briefPoints
+      .map(p => p === null ? custom : p)
+      .filter(p => p && p.trim());
   }
 
   // ── report preview ─────────────────────────────────────────────────────────
@@ -1613,6 +1991,7 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
     if (!val('caseId'))   { alert('Please enter a Case ID first.');             return; }
     if (!val('day1Date')) { alert('Please fill in at least Day 1 date first.'); return; }
 
+    const T                 = caseType();
     const caseId            = val('caseId');
     const location          = val('location');
     const activationType    = document.getElementById('activationType').value;
@@ -1620,28 +1999,9 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
     const activationDateRaw = val('activationDate');
     const officerName       = val('officerName');
     const officerHP         = val('officerHP');
-    const animalBehaviour   = raw('animalBehaviour');
-    const possibleHabitats  = raw('possibleHabitats');
-    const foodSources       = raw('foodSources');
-    const environment       = raw('environment');
+    const briefPoints       = buildBriefPoints();
 
-    const days = [];
-    for (let i = 1; i <= 3; i++) {
-      const dateRaw = document.getElementById(`day${i}Date`).value;
-      if (!dateRaw) continue;
-      days.push({
-        idx:     i,
-        date:    fmtDate(dateRaw),
-        dateRaw,
-        start:   document.getElementById(`day${i}Start`).value,
-        end:     document.getElementById(`day${i}End`).value,
-        pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
-        mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
-        crows:    document.getElementById(`day${i}Crows`).value     || '0',
-        chickens: document.getElementById(`day${i}Chickens`).value  || '0',
-        notes:    document.getElementById(`day${i}Notes`).value,
-      });
-    }
+    const days = collectDays();
 
     const dayNums   = days.map(d => new Date(d.dateRaw + 'T00:00:00').getDate()).join(',');
     const firstDt   = new Date(days[0].dateRaw + 'T00:00:00');
@@ -1668,14 +2028,15 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
       return `
       <tr>
         <td style="width:25%;vertical-align:top;">
-          <strong>Day ${i + 1}</strong><br><strong>${d.date}</strong><br>${fmtTime(d.start)}–${fmtTime(d.end)}
+          <strong>Day ${i + 1}</strong><br><strong>${fmtDateFor(d.dateRaw)}</strong><br>${fmtTime(d.start)}–${fmtTime(d.end)}
         </td>
         <td style="width:75%;vertical-align:top;">${photoHtml}${toHtml(d.notes)}</td>
       </tr>`;
     }).join('');
 
-    const sightingsCells = days.map(d =>
-      `<p><u>${d.date}</u></p><p>Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens</p>`
+    const sightingsCells = days.map((d, i) =>
+      caseType().sighting(d, i)
+        .map(p => `<p>${p.underline ? `<u>${p.text}</u>` : p.text}</p>`).join('')
     ).join('<br>');
 
     let photoNote = '';
@@ -1734,42 +2095,36 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
 <div class="page">
   <h1>OB LOG FOR ${caseId}</h1>
   <h2>${location}</h2>
-  <p><strong>Type of Activation:</strong> ${activationType}</p>
+  ${T.showActivationType ? `<p><strong>Type of Activation:</strong> ${activationType}</p>` : ''}
   <p><strong>Activating Officer:</strong> ${activatingOfficer}</p>
   <p><strong>Activation Date:</strong> ${fmtDate(activationDateRaw)}</p>
   <p><strong>Location:</strong> ${location}</p>
   <p><strong>Surveillance Dates:</strong> ${survDates}</p>
   <p style="margin-bottom:14pt;"><strong>Surveillance Officer:</strong> ${officerName}${officerHP ? ` | HP: ${officerHP}` : ''}</p>
 
-  <p class="sh">DETAILS OF SURVEILLANCE</p>
-  <p><strong><u>Monitor presence of bird feeding, bird population, or leaving of food</u></strong></p>
-  <p><u>Pigeon surveillance</u></p>
-  <p>1) To carry out surveillance for bird feeding.</p>
-  <p>2) To inform feeder that feeding any forms of wildlife is an offence and highlight that they can be fined up to $10,000.</p>
-  <p>3) Count no. of different bird species sighted and number of birds of each species sighted.</p>
-  <p style="margin-bottom:14pt;">4) Distribute pamphlets to feeder and members of public encountered during surveillance.</p>
+  <p><strong><u>${T.briefTitle}</u></strong></p>
+  ${T.briefSubtitle ? `<p><u>${T.briefSubtitle}</u></p>` : ''}
+  ${briefPoints.map((p, i) => `<p${i === briefPoints.length - 1 ? ' style="margin-bottom:14pt;"' : ''}>${i + 1}) ${p}</p>`).join('')}
 
-  <p class="sh">SUMMARY OF OBSERVATIONS</p>
+  <p class="sh">${T.summaryTableTitle}</p>
   <table>
     <tr><th style="width:30%">Description</th><th style="width:70%">Observations</th></tr>
     <tr><td><strong>The maximum number and description of animals sighted:</strong></td><td>${sightingsCells}</td></tr>
-    <tr><td><strong>Animal behaviour displayed:</strong></td><td>${toHtml(animalBehaviour)}</td></tr>
-    <tr><td><strong>Possible habitats of the animals:</strong></td><td>${toHtml(possibleHabitats)}</td></tr>
-    <tr><td><strong>Availability of food sources, including any evidence of feeding or littering:</strong></td><td>${toHtml(foodSources)}</td></tr>
-    <tr><td><strong>The environment, including buildings, trees and terrain:</strong></td><td><p>${location}. ${environment}</p></td></tr>
-    <tr><td><strong>Behaviours of pet owners and pets, including but not limited to allowing pets to be unleashed or defecate in public, barking or smell.</strong></td><td>Nil</td></tr>
-    <tr><td><strong>Any interaction with the feedback provider, members of the public and/or other agencies</strong></td><td>Nil</td></tr>
+    ${T.summaryFields.map(f => {
+      const v = raw(f.key);
+      return `<tr><td><strong>${f.rowLabel}</strong></td><td>${f.prefixLocation ? `<p>${location}. ${v}</p>` : toHtml(v)}</td></tr>`;
+    }).join('')}
   </table>
 
-  <p class="sh">SURVEILLANCE OBSERVATIONS – DATE / TIME</p>
+  <p class="sh">${T.detailsTableTitle}</p>
   <table>
     <tr><th style="width:25%">Day / Time</th><th style="width:75%">Observation Details</th></tr>
     ${survObsRows}
   </table>
+  ${T.completedLine ? `<p style="margin-bottom:14pt;"><strong>${T.completedLine}</strong></p>` : ''}
 
   <p class="sh">ATTACHMENTS</p>
-  <p>Photos and screenshots of videos taken minimally at 15-minute intervals.</p>
-  <p>Photographs/video (via email/phone) with date and time stamps, submitted herewith as proof of above surveillance and observations, in chronological order.</p>
+  ${T.attachments.map(a => `<p>${a}</p>`).join('')}
   ${photoNote}
 
   <div class="sig">
@@ -1861,28 +2216,10 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
       const activationDateRaw = val('activationDate');
       const officerName      = val('officerName');
       const officerHP        = val('officerHP');
-      const animalBehaviour  = raw('animalBehaviour');
-      const possibleHabitats = raw('possibleHabitats');
-      const foodSources      = raw('foodSources');
-      const environment      = raw('environment');
+      const T                = caseType();
+      const briefPoints      = buildBriefPoints();
 
-      const days = [];
-      for (let i = 1; i <= 3; i++) {
-        const dateRaw = document.getElementById(`day${i}Date`).value;
-        if (!dateRaw) continue;
-        days.push({
-          idx:     i,
-          date:    fmtDate(dateRaw),
-          dateRaw,
-          start:   document.getElementById(`day${i}Start`).value,
-          end:     document.getElementById(`day${i}End`).value,
-          pigeons:  document.getElementById(`day${i}Pigeons`).value   || '0',
-          mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
-          crows:    document.getElementById(`day${i}Crows`).value     || '0',
-          chickens: document.getElementById(`day${i}Chickens`).value  || '0',
-          notes:    document.getElementById(`day${i}Notes`).value,
-        });
-      }
+      const days = collectDays();
 
       // ── surveillance dates header string ───────────────────────────────────
       const dayNums    = days.map(d => new Date(d.dateRaw + 'T00:00:00').getDate()).join(',');
@@ -1947,16 +2284,12 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
       // ── sightings paragraphs (one block per day) ───────────────────────────
       const sightingParas = [];
       days.forEach((d, idx) => {
-        sightingParas.push(new D.Paragraph({
-          children: [TRs({ text: d.date, underline: { type: 'single' } })],
-          spacing: sp0,
-        }));
-        sightingParas.push(new D.Paragraph({
-          children: [TRs({
-            text: `Time: ${fmtTime(d.start)} to ${fmtTime(d.end)} – about ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens`,
-          })],
-          spacing: sp0,
-        }));
+        T.sighting(d, idx).forEach(p => {
+          sightingParas.push(new D.Paragraph({
+            children: [TRs(p.underline ? { text: p.text, underline: { type: 'single' } } : { text: p.text })],
+            spacing: sp0,
+          }));
+        });
         if (idx < days.length - 1) sightingParas.push(emptyPara());
       });
 
@@ -1974,33 +2307,12 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
             lCell('The maximum number and description of animals sighted:'),
             cCell(sightingParas),
           ]}),
-          new D.TableRow({ children: [
-            lCell('Animal behaviour displayed:'),
-            cCell(textToParas(animalBehaviour)),
-          ]}),
-          new D.TableRow({ children: [
-            lCell('Possible habitats of the animals:'),
-            cCell(textToParas(possibleHabitats)),
-          ]}),
-          new D.TableRow({ children: [
-            lCell('Availability of food sources, including any evidence of feeding or littering:'),
-            cCell(textToParas(foodSources)),
-          ]}),
-          new D.TableRow({ children: [
-            lCell('The environment, including buildings, trees and terrain:'),
-            cCell([new D.Paragraph({
-              children: [TRs({ text: `${location}. ${environment}` })],
-              spacing: sp0,
-            })]),
-          ]}),
-          new D.TableRow({ children: [
-            lCell('Behaviours of pet owners and pets, including but not limited to allowing pets to be unleashed or defecate in public, barking or smell.'),
-            cCell([new D.Paragraph({ children: [TRs({ text: 'Nil' })], spacing: sp0 })]),
-          ]}),
-          new D.TableRow({ children: [
-            lCell('Any interaction with the feedback provider, members of the public and/or other agencies'),
-            cCell([new D.Paragraph({ children: [TRs({ text: 'Nil' })], spacing: sp0 })]),
-          ]}),
+          ...T.summaryFields.map(f => new D.TableRow({ children: [
+            lCell(f.rowLabel),
+            cCell(f.prefixLocation
+              ? [new D.Paragraph({ children: [TRs({ text: `${location}. ${raw(f.key)}` })], spacing: sp0 })]
+              : textToParas(raw(f.key))),
+          ]})),
         ],
       });
 
@@ -2037,7 +2349,7 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
             new D.TableCell({
               children: [
                 new D.Paragraph({ children: [TRs({ text: `Day ${idx + 1}`, bold: true })], spacing: sp0 }),
-                new D.Paragraph({ children: [TRs({ text: d.date, bold: true })], spacing: sp0 }),
+                new D.Paragraph({ children: [TRs({ text: fmtDateFor(d.dateRaw), bold: true })], spacing: sp0 }),
                 new D.Paragraph({ children: [TRs({ text: `${fmtTime(d.start)}–${fmtTime(d.end)}` })], spacing: sp0 }),
               ],
               width:   { size: dxa(25), type: D.WidthType.DXA },
@@ -2066,29 +2378,35 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
       const docChildren = [
         new D.Paragraph({ children: [TR({ text: `OB LOG FOR ${caseId}`, bold: true, size: 28 })], alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 60 } }),
         new D.Paragraph({ children: [TR({ text: location, bold: true, size: 24 })], alignment: D.AlignmentType.CENTER, spacing: { before: 0, after: 240 } }),
-        kvPara('Type of Activation',   activationType),
+        ...(T.showActivationType ? [kvPara('Type of Activation', activationType)] : []),
         kvPara('Activating Officer',   activatingOfficer),
         kvPara('Activation Date',      fmtDate(activationDateRaw)),
         kvPara('Location',             location),
         kvPara('Surveillance Dates',   survDates),
         kvPara('Surveillance Officer', officerName + (officerHP ? ` | HP: ${officerHP}` : '')),
         new D.Paragraph({ children: [TR({ text: '' })], spacing: { before: 0, after: 160 } }),
-        new D.Paragraph({ children: [TR({ text: 'DETAILS OF SURVEILLANCE', bold: true, size: 24 })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: 'Monitor presence of bird feeding, bird population, or leaving of food', bold: true, underline: { type: 'single' } })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: 'Pigeon surveillance', underline: { type: 'single' } })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: '1) To carry out surveillance for bird feeding.' })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: '2) To inform feeder that feeding any forms of wildlife is an offence and highlight that they can be fined up to $10,000.' })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: '3) Count no. of different bird species sighted and number of birds of each species sighted.' })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: '4) Distribute pamphlets to feeder and members of public encountered during surveillance.' })], spacing: { before: 0, after: 200 } }),
-        new D.Paragraph({ children: [TR({ text: 'SUMMARY OF OBSERVATIONS', bold: true, size: 24 })], spacing: { before: 0, after: 100 } }),
+        new D.Paragraph({ children: [TR({ text: T.briefTitle, bold: true, underline: { type: 'single' } })], spacing: sp0 }),
+        ...(T.briefSubtitle
+          ? [new D.Paragraph({ children: [TR({ text: T.briefSubtitle, underline: { type: 'single' } })], spacing: sp0 })]
+          : []),
+        ...briefPoints.map((p, i) => new D.Paragraph({
+          children: [TR({ text: `${i + 1}) ${p}` })],
+          spacing: i === briefPoints.length - 1 ? { before: 0, after: 200 } : sp0,
+        })),
+        new D.Paragraph({ children: [TR({ text: T.summaryTableTitle, bold: true, size: 24 })], spacing: { before: 0, after: 100 } }),
         summaryTable,
         new D.Paragraph({ children: [TR({ text: '' })], spacing: { before: 0, after: 160 } }),
-        new D.Paragraph({ children: [TR({ text: 'SURVEILLANCE OBSERVATIONS – DATE / TIME', bold: true, size: 24 })], spacing: { before: 0, after: 100 } }),
+        new D.Paragraph({ children: [TR({ text: T.detailsTableTitle, bold: true, size: 24 })], spacing: { before: 0, after: 100 } }),
         survTable,
+        ...(T.completedLine
+          ? [new D.Paragraph({ children: [TR({ text: T.completedLine, bold: true })], spacing: { before: 200, after: 0 } })]
+          : []),
         new D.Paragraph({ children: [TR({ text: '' })], spacing: { before: 0, after: 240 } }),
         new D.Paragraph({ children: [TR({ text: 'ATTACHMENTS', bold: true, size: 24 })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: 'Photos and screenshots of videos taken minimally at 15-minute intervals.' })], spacing: sp0 }),
-        new D.Paragraph({ children: [TR({ text: 'Photographs/video (via email/phone) with date and time stamps, submitted herewith as proof of above surveillance and observations, in chronological order.' })], spacing: { before: 0, after: 240 } }),
+        ...T.attachments.map((a, i) => new D.Paragraph({
+          children: [TR({ text: a })],
+          spacing: i === T.attachments.length - 1 ? { before: 0, after: 240 } : sp0,
+        })),
       ];
 
       // ── Photo sections ─────────────────────────────────────────────────────
@@ -2121,7 +2439,7 @@ ${BEHAVIOUR_STYLE_EXAMPLES}`
           if (!dayPhotos.length) continue;
           const day = days[di];
           docChildren.push(new D.Paragraph({
-            children: [TR({ text: `PHOTOGRAPHS / VIDEOS: ${day.date} | ${fmtTime(day.start)}–${fmtTime(day.end)}`, bold: true, size: 24 })],
+            children: [TR({ text: `PHOTOGRAPHS / VIDEOS: ${T.photoDayPrefix ? `DAY ${di + 1} > ` : ''}${fmtDateFor(day.dateRaw)} | ${fmtTime(day.start)}–${fmtTime(day.end)}`, bold: true, size: 24 })],
             spacing: { before: 240, after: 120 },
           }));
           await embedPhotoRows(dayPhotos);
