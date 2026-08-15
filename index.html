@@ -15,8 +15,7 @@
       font-family: 'Segoe UI', Tahoma, sans-serif;
       background: #f0f6f0;
       min-height: 100vh;
-      padding: 16px 12px 120px;
-      padding-bottom: max(120px, calc(100px + env(safe-area-inset-bottom)));
+      padding: 16px 12px;
     }
     .container { max-width: 860px; margin: 0 auto; }
 
@@ -164,16 +163,10 @@
     .hint { font-size: 12px; color: #888; margin-top: 2px; line-height: 1.4; }
     .divider { border: none; border-top: 1px dashed #ddd; margin: 16px 0; }
 
-    /* ── Sticky generate button ──────────────────────────────────────────────── */
+    /* ── Step buttons: in normal flow at the end of the form ─────────────────── */
     .btn-wrap {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 12px 14px;
-      padding-bottom: max(12px, env(safe-area-inset-bottom));
-      background: linear-gradient(to top, #f0f6f0 75%, transparent);
-      z-index: 100;
+      padding: 8px 0 24px;
+      padding-bottom: max(24px, calc(16px + env(safe-area-inset-bottom)));
     }
     .btn-generate {
       width: 100%;
@@ -197,7 +190,7 @@
 
     /* ── Desktop overrides (≥ 600px) ─────────────────────────────────────────── */
     @media (min-width: 600px) {
-      body { padding: 24px 20px 80px; }
+      body { padding: 24px 20px; }
       .card { padding: 22px 24px; }
       .page-title { font-size: 22px; }
       .g2   { grid-template-columns: 1fr 1fr; }
@@ -208,7 +201,7 @@
       .bird-row > :nth-child(-n+3), .bird-row > :nth-child(n+4) { grid-column: auto; }
       .bird-row .form-group label { font-size: 11px; }
       .bird-row input { padding: 8px 6px; font-size: 13px; }
-      .btn-wrap { position: static; background: none; padding: 8px 0 40px; }
+      .btn-wrap { padding: 8px 0 40px; }
     }
 
     /* ── Photo upload ─────────────────────────────────────────────────────── */
@@ -278,7 +271,8 @@
     /* ── Fast Game modal ────────────────────────────────────────────────────── */
     .fast-game-btn {
       position: fixed;
-      bottom: 90px;
+      bottom: 24px;
+      bottom: max(24px, calc(16px + env(safe-area-inset-bottom)));
       right: 16px;
       z-index: 200;
       padding: 10px 18px;
