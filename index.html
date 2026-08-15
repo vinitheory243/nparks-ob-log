@@ -383,6 +383,120 @@
     }
     .fast-game-cancel:active { background: #f5f5f5; }
 
+    /* ── Adv Opt: phrases picked from a list instead of typed ────────────────── */
+    .label-actions { display: inline-flex; align-items: center; gap: 6px; }
+    .btn-adv {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      background: #f0f8f2;
+      color: #1a5c2a;
+      border: 1.5px solid #a8d8b2;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-adv:active { background: #dceee2; }
+
+    .adv-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .adv-overlay.open { display: flex; }
+    .adv-box {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 460px;
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+    }
+    .adv-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 2px solid #f0f0f0;
+      flex-shrink: 0;
+    }
+    .adv-header span { font-size: 16px; font-weight: 700; color: #1a5c2a; }
+    .adv-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: #888;
+      line-height: 1;
+      padding: 4px 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .adv-list { overflow-y: auto; padding: 6px 12px; flex: 1; }
+    .adv-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 12px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1.35;
+      color: #333;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .adv-item + .adv-item { border-top: 1px solid #f2f2f2; }
+    .adv-item:active { background: #f4faf5; }
+    .adv-item input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      flex-shrink: 0;
+      accent-color: #1a5c2a;
+    }
+    .adv-footer {
+      padding: 14px 20px;
+      border-top: 2px solid #f0f0f0;
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .adv-add {
+      flex: 1;
+      padding: 13px;
+      background: #1a5c2a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .adv-add:active { background: #145222; }
+    .adv-cancel {
+      padding: 13px 20px;
+      background: #fff;
+      color: #555;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .adv-cancel:active { background: #f5f5f5; }
+
     /* ── Per-day photo upload ───────────────────────────────────────────────── */
     .day-photo-wrap { margin-top: 10px; }
     .btn-day-photo {
@@ -708,6 +822,21 @@
   </div>
 </div>
 
+<!-- Adv Opt modal: shared by all three days, built fresh each time it opens -->
+<div class="adv-overlay" id="advOptOverlay">
+  <div class="adv-box">
+    <div class="adv-header">
+      <span id="advOptTitle">Common phrases</span>
+      <button class="adv-close" onclick="closeAdvOpt()">✕</button>
+    </div>
+    <div class="adv-list" id="advOptList"></div>
+    <div class="adv-footer">
+      <button class="adv-cancel" onclick="closeAdvOpt()">Cancel</button>
+      <button class="adv-add" onclick="applyAdvOpt()">Add to notes</button>
+    </div>
+  </div>
+</div>
+
 <div class="btn-wrap">
   <div id="step1Buttons">
     <button class="btn-generate" style="max-width:860px;margin:0 auto;display:block;" onclick="goStep2()">
@@ -789,6 +918,21 @@
 
       notesLabel: 'Observation Notes',
       notesPlaceholder: 'Describe what was observed during this shift…',
+
+      // Adv Opt — the phrases the officers write over and over. Picked from a
+      // list instead of typed, appended to the notes box verbatim, and the
+      // Generate button then works them into the report voice. A case type
+      // with no list here simply has no Adv Opt button.
+      quickPhrases: [
+        'I arrived at activation spot',
+        'Not much birds today',
+        'No active feeder seen',
+        'General litter',
+        'Feeding but natural sources',
+        'Birds on ledges',
+        'Birds on trees',
+        'Feeding on prayer food',
+      ],
       notesBrief: 'Cover the counts, where the birds were and what they were doing, and whether any feeding, food remains or litter was present. Do not narrate arriving or leaving.',
       notesExamples: `Below are observation notes from OB logs that were submitted and accepted. Match this voice — the sentence rhythm, the hedging, the level of detail, the plainness.
 
@@ -1207,9 +1351,15 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     if (!t.hourly) {
       const prev = document.getElementById(`day${n}Notes`);
       const keep = prev ? prev.value : '';
+      const adv = t.quickPhrases && t.quickPhrases.length
+        ? `<button class="btn-adv" onclick="openAdvOpt(${n})">Adv Opt</button>`
+        : '';
       wrap.innerHTML = `<div class="form-group">
         <label class="label-row">Day ${n} ${t.notesLabel}
-          <button class="btn-ai" onclick="generateDayNotes(${n}, this)">✦ Generate</button>
+          <span class="label-actions">
+            ${adv}
+            <button class="btn-ai" onclick="generateDayNotes(${n}, this)">✦ Generate</button>
+          </span>
         </label>
         <textarea id="day${n}Notes" rows="4" placeholder="${t.notesPlaceholder}"></textarea>
       </div>`;
@@ -1293,6 +1443,43 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
       out.push({ idx: i, dateRaw, date: fmtDate(dateRaw), start, end, c, t: tx, blocks, notes });
     }
     return out;
+  }
+
+  // ── adv opt ────────────────────────────────────────────────────────────────
+  // The phrases go into the notes box verbatim and unpolished — Generate is
+  // what turns them into report prose, so this only has to save typing.
+  let advOptDay = null;
+
+  function openAdvOpt(n) {
+    const phrases = caseType().quickPhrases || [];
+    if (!phrases.length) return;
+    advOptDay = n;
+    document.getElementById('advOptTitle').textContent = `Day ${n} — common phrases`;
+    document.getElementById('advOptList').innerHTML = phrases
+      .map((p, i) => `<label class="adv-item"><input type="checkbox" data-i="${i}" /><span>${p}</span></label>`)
+      .join('');
+    document.getElementById('advOptOverlay').classList.add('open');
+  }
+
+  function closeAdvOpt() {
+    document.getElementById('advOptOverlay').classList.remove('open');
+    advOptDay = null;
+  }
+
+  // Appends rather than replaces, so the phrases land after anything already
+  // typed and a second pass can add more without wiping the first.
+  function applyAdvOpt() {
+    const phrases = caseType().quickPhrases || [];
+    const picked  = [...document.querySelectorAll('#advOptList input:checked')]
+      .map(el => phrases[+el.dataset.i]);
+    const el = document.getElementById(`day${advOptDay}Notes`);
+    if (picked.length && el) {
+      const line = picked.join('. ') + '.';
+      const cur  = el.value.trim();
+      el.value = cur ? `${cur.replace(/\.?$/, '.')} ${line}` : line;
+      el.focus();
+    }
+    closeAdvOpt();
   }
 
   // ── fast game ──────────────────────────────────────────────────────────────

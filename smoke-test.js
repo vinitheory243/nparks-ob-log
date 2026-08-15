@@ -72,6 +72,43 @@ ok('preview: SUMMARY OF OBSERVATIONS title', html.includes('SUMMARY OF OBSERVATI
 ok('preview: no Completed Surveillance line', !html.includes('Completed Surveillance'));
 ok('preview: bird attachments wording', html.includes('Photos and screenshots of videos'));
 
+console.log('\n--- adv opt ---');
+ok('Adv Opt button on all 3 days', doc.querySelectorAll('#daysContainer .btn-adv').length === 3);
+window.openAdvOpt(1);
+ok('modal opens', $('advOptOverlay').classList.contains('open'));
+ok('titled for the day it was opened from', $('advOptTitle').textContent.includes('Day 1'));
+ok('8 phrases listed', doc.querySelectorAll('#advOptList .adv-item').length === 8);
+
+const advBoxes = [...doc.querySelectorAll('#advOptList input')];
+advBoxes[0].checked = true; advBoxes[2].checked = true;   // 1st and 3rd phrase
+window.applyAdvOpt();
+ok('modal closes on add', !$('advOptOverlay').classList.contains('open'));
+ok('phrases appended after existing notes, in list order',
+   $('day1Notes').value === 'saw birds at the grass patch. I arrived at activation spot. No active feeder seen.',
+   $('day1Notes').value);
+
+// a second pass must add to the first, not replace it
+window.openAdvOpt(1);
+[...doc.querySelectorAll('#advOptList input')][5].checked = true;   // "Birds on ledges"
+window.applyAdvOpt();
+ok('second pass appends', $('day1Notes').value.endsWith('No active feeder seen. Birds on ledges.'),
+   $('day1Notes').value);
+
+// picking nothing must leave the box untouched
+const beforeEmpty = $('day1Notes').value;
+window.openAdvOpt(1); window.applyAdvOpt();
+ok('empty selection is a no-op', $('day1Notes').value === beforeEmpty);
+
+// opening from day 2 must fill day 2, not day 1
+window.openAdvOpt(2);
+[...doc.querySelectorAll('#advOptList input')][1].checked = true;   // "Not much birds today"
+window.applyAdvOpt();
+ok('writes to the day it was opened from', $('day2Notes').value === 'Not much birds today.', $('day2Notes').value);
+ok('day 1 untouched by a day 2 pick', $('day1Notes').value === beforeEmpty);
+
+setv('day1Notes', 'saw birds at the grass patch');   // restore for later assertions
+setv('day2Notes', '');
+
 console.log('\n=== SWITCH TO DOG ===');
 $('caseType').value = 'dog';
 window.onCaseTypeChange();
@@ -97,6 +134,9 @@ setv('day1End', '19:00'); window.renderNotes(1);
 const labels2 = [...doc.querySelectorAll('#day1NotesWrap .hour-block-label')].map(e => e.textContent);
 ok('part-hour shift ends at real end time', labels2[labels2.length - 1] === '1830–1900 hrs', labels2.join('|'));
 setv('day1End', '19:30'); window.renderNotes(1);
+
+// dog has no quickPhrases list, so the button must not render at all
+ok('no Adv Opt button on dog', doc.querySelectorAll('#daysContainer .btn-adv').length === 0);
 
 setv('day1Leashed', '4'); setv('day1Unleashed', '0'); setv('day1Advisories', '0');
 setv('day1Others', '1 cat');
@@ -151,6 +191,7 @@ ok('Type of Activation visible again', $('activationTypeGroup').style.display !=
 ok('brief box removed', !$('briefCustom'));
 ok('bird defaults restored', $('petOwners').value === 'Nil');
 ok('bird brief back to 4 points', window.buildBriefPoints().length === 4);
+ok('Adv Opt button back on bird', doc.querySelectorAll('#daysContainer .btn-adv').length === 3);
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
