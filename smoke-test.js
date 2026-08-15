@@ -77,7 +77,7 @@ ok('Adv Opt button on all 3 days', doc.querySelectorAll('#daysContainer .btn-adv
 window.openAdvOpt(1);
 ok('modal opens', $('advOptOverlay').classList.contains('open'));
 ok('titled for the day it was opened from', $('advOptTitle').textContent.includes('Day 1'));
-ok('8 phrases listed', doc.querySelectorAll('#advOptList .adv-item').length === 8);
+ok('10 phrases listed', doc.querySelectorAll('#advOptList .adv-item').length === 10);
 
 const advBoxes = [...doc.querySelectorAll('#advOptList input')];
 advBoxes[0].checked = true; advBoxes[2].checked = true;   // 1st and 3rd phrase
