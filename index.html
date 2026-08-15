@@ -1324,9 +1324,11 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
       ...t.counts.map(c => `${c.key.toLowerCase()}: number`),
       ...t.texts.map(x  => `${x.key.toLowerCase()}: string`),
     ].join(', ');
+    const now      = new Date();
+    const todayISO = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     const system = `You are a data parser for an NParks Singapore ${t.label} surveillance report system.
 Extract structured data from the user's free-form text and return ONLY a valid JSON object — no explanation, no markdown, no code fences.
-Current year: ${new Date().getFullYear()}.
+Today's date: ${todayISO}.
 
 Fields to extract (only include fields clearly mentioned):
 - caseId: string
@@ -1342,8 +1344,8 @@ Time parsing rules:
 - "1430" or "2:30pm" or "2.30pm" → "14:30"
 - "2pm" → "14:00", "11am" → "11:00"
 Date parsing rules:
-- Dates without year: assume ${new Date().getFullYear()}
-- "21 may" → "${new Date().getFullYear()}-05-21"
+- Surveillance is always already done, so a date with no year is on or before today. Use the current year, or the previous year when the current year would put the date in the future.
+- e.g. if today were 2027-01-04: "2 jan" → "2027-01-02", "28 dec" → "2026-12-28", "21 may" → "2026-05-21"
 Return ONLY the JSON object.`;
 
     try {
