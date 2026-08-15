@@ -1424,6 +1424,64 @@ Return ONLY the JSON object.`;
     }
   }
 
+  // ── House style ────────────────────────────────────────────────────────────
+  // Real observation notes from submitted-and-accepted OB logs, reproduced VERBATIM
+  // including their loose grammar. These teach the model the officer's actual voice;
+  // describing the style in prose does not work nearly as well. Do not "correct" the
+  // examples — the slightly unpolished writing is what makes the output read as a
+  // human field note rather than a press release, and NParks accepts it as-is.
+  // Add or swap examples here to shift the house style.
+  const OB_STYLE_EXAMPLES = `Below are observation notes from OB logs that were submitted and accepted. Match this voice — the sentence rhythm, the hedging, the level of detail, the plainness.
+
+<example>
+I saw a total of about 14 pigeons, 3 mynas, 2 crows, and 5 chickens in the area. During my entire observation period, I did not witness any active feeding behaviour by any of the birds.
+
+All the birds were gathered and relaxing at the grass patch in front of Block 22A multi-storey carpark. Based on my observations, this location and the grass patch at Block 60 facing Block 22A appear to be the birds' preferred gathering areas even when not actively feeding.
+</example>
+
+<example>
+I saw about 9 pigeons gathered at the same location where they were congregating on day 2. Prayer food was present again at the site, though the birds were not observed feeding on it.
+
+In addition to the pigeons, I counted 4 mynas, 2 crows, and 3 chickens in the area. The pigeons remained in their same spot as day 2 despite the availability of the prayer food.
+</example>
+
+<example>
+I saw prayers were already underway at the area. While no dedicated bird feeder was seen, I noted that the birds present were actively feeding on prayer food.
+
+During this period, I counted a total of 17 pigeons, 4 mynas, 2 crows, and 4 chickens in the vicinity. The birds were just all gathered at the prayer food this day.
+</example>
+
+<example>
+I remained in the area and did not go into the insides of the estate, as I was specifically monitoring for the group of students referenced in the excel spreadsheet. However, neither the students nor any bird activity was observed during this period. My bird count for the shift recorded zero pigeons, zero mynas, zero crows, and zero chickens across the entire observation area. Saw 1 piece of litter.
+</example>
+
+<example>
+I did not see the students during this shift, but as I walked around the block I noticed a significant gathering of birds further down the area near block 41. Upon closer inspection, I saw food waste scattered about, including waste in the drain and what appeared to be two pieces of vegetables lying on the grass. The was about 17 pigeons, 5 mynas, 3 crows, and 4 chickens.
+
+The litter situation at block 41 was worse compared to block 32. Block 41 appeared considerably dirtier overall, which I believe is directly contributing to the higher bird activity in that zone.
+</example>
+
+<example>
+I saw the birds gathered in the sheltered walkway at Block 391 that leads toward the carpark, and they all appeared to be waiting for something. The saw about 12 pigeons, 2 mynas, and 1 crow, with no chickens sighted.
+
+As I was walking around Blk 391, all the birds suddenly took flew and moved to Block 390. When I got there, I found them all feeding on what appeared to be half a slice of bread lying on the ground. I could not determine whether this bread came from an irresponsible resident disposing of waste or from someone deliberately feeding the birds, but the presence of this food source was clearly what had drawn the group over.
+</example>
+
+<example>
+I saw about 5 pigeons, 2 mynas, and 1 crow in the area, with no chickens sighted. I did not observe any feeding activity throughout the duration of my patrol.
+</example>
+
+House rules drawn from the examples above:
+- State counts hedged — "about 14 pigeons", not an exact-sounding figure. A species with none is "no chickens sighted" or "0 mynas".
+- One or two short paragraphs. On a quiet shift a single short paragraph is correct — do not pad.
+- Say where the birds actually were, and account for litter or food sources, including saying plainly when there were none.
+- Hedge where you are unsure: "appeared to be", "I could not determine whether", "based on my observations".
+- Refer back to earlier days when it is relevant ("same spot as day 2", "compared to the previous day").
+- Plain words only. Never use "furthermore", "moreover", "additionally", "notably", or "it is worth noting".
+- Do not over-polish. The examples are typed the way a working officer types, and some sentences are loose or slightly ungrammatical — that is correct and is accepted as submitted. Keep the writing plain and a little informal; do not smooth it into corporate or press-release prose. This applies to the officer's own rough notes too: tidy them only as far as the examples are tidy, and leave their wording alone where it already reads like the examples.
+
+CRITICAL: the examples above come from other cases. The block numbers, locations, prayer food, students, bread and every other specific detail in them belong to those reports, not this one. Never carry a detail from an example into your output. Write only from the shift details you are given, plus what the officer's own rough notes say.`;
+
   async function generateDayNotes(day, btn) {
     const location = val('location') || 'the activation site';
     const dateRaw  = document.getElementById(`day${day}Date`).value;
@@ -1437,10 +1495,14 @@ Return ONLY the JSON object.`;
 
     const existing = document.getElementById(`day${day}Notes`).value.trim();
 
-    const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout. Sound like a real officer writing naturally, not a formal report template. Plain text only — no titles, no headers, no bold, no asterisks, no markdown. Write 3–5 sentences across 2–3 short paragraphs.`;
+    const system = `You are an NParks Singapore field surveillance officer writing your own first-person observation notes in a government Occurrence Book report. Write as yourself — use "I" throughout.
+
+Plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags.
+
+${OB_STYLE_EXAMPLES}`;
 
     const prompt = existing
-      ? `Rephrase and expand these rough notes into polished first-person observation notes. Keep ALL the details and context from the original — do not invent new facts or discard anything. Just make it flow naturally as a first-person field report written by the officer who was there.
+      ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.
 
 Shift details:
 Location: ${location}, Date: ${date}, Shift: ${start} to ${end}, Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
@@ -1453,7 +1515,7 @@ Date: ${date}
 Shift: ${start} to ${end}
 Bird counts: ${pigeons} pigeons, ${mynas} mynas, ${crows} crows, ${chickens} chickens
 
-Write as the officer who was there. Include when I arrived, what I observed (bird behaviour, perching spots, foraging, any feeders or public interaction), and how the shift ended. Use "I" throughout. Sound human and natural.`;
+Write as the officer who was there, in the same voice as the examples. Cover the counts, where the birds were and what they were doing, and whether any feeding, food remains or litter was present. Do not narrate arriving or leaving, and do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
 
     try {
       const text = await callClaude(system, prompt, btn);
@@ -1462,6 +1524,36 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
       alert('AI generation failed: ' + err.message);
     }
   }
+
+  // ── House style: "Animal behaviour displayed" only ─────────────────────────
+  // Real entries from submitted-and-accepted OB logs, VERBATIM including their loose
+  // grammar and sentence fragments. Note how short they are and that they are built
+  // around comparing the days against each other — that is the whole point of this
+  // box. Do not "correct" these. Only this one summary field uses examples; the other
+  // three boxes are deliberately left on their original generic prompt.
+  const BEHAVIOUR_STYLE_EXAMPLES = `Below are "Animal behaviour displayed" entries from OB logs that were submitted and accepted. Match this voice and this length.
+
+<example>
+Pigeons were all gathering at the same area on all 3 days but on day 2 there were barely any pigeons at that same spot. They seem to be waiting on all 3 days because even after feeding on the bread on day 1 they flew back to the same spot.
+</example>
+
+<example>
+Barely any birds around Blk 32. The birds were more populated at Blk 41 and were feeding on the irresponsibly discarded food waste and the other scraps of litter found in the area.
+</example>
+
+<example>
+The birds were seen feeding on the prayer food on day 1 but on days 2 and 3 they seemed to be either waiting around or just relaxing at their regular spot.
+</example>
+
+House rules drawn from the examples above:
+- Short. One paragraph, one to three sentences. Never longer. Do not pad it out to fill the box.
+- Third person — no "I". This box is not written in first person, unlike the daily observation notes.
+- Compare the days against each other. That contrast is the substance of this box: which day differed, where the birds moved, whether feeding happened on some days and not others.
+- Say what the birds appeared to be doing and offer the plain reading of it — waiting, relaxing, gathering, feeding — hedged with "seem to be" or "seemed to be".
+- Name the specific spot or block when you know it, using the officer's own wording ("Blk 41", "their regular spot", "the same spot").
+- Plain and blunt. Sentence fragments like "Barely any birds around Blk 32." are correct. Do not smooth this into formal report prose, and never use "furthermore", "moreover", "additionally", "notably", or "throughout the surveillance period".
+
+CRITICAL: the examples come from other cases. The block numbers, the bread, the prayer food and the discarded food waste belong to those reports, not this one. Never carry a detail from an example into your output — write only from the shift data and the officer's own daily notes given below.`;
 
   async function generateSection(field, btn) {
     const location = val('location') || 'the activation site';
@@ -1477,6 +1569,7 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
         mynas:    document.getElementById(`day${i}Mynas`).value     || '0',
         crows:    document.getElementById(`day${i}Crows`).value     || '0',
         chickens: document.getElementById(`day${i}Chickens`).value  || '0',
+        notes:    document.getElementById(`day${i}Notes`).value.trim(),
       });
     }
     if (!days.length) { alert('Please fill in at least Day 1 before generating.'); return; }
@@ -1485,10 +1578,23 @@ Write as the officer who was there. Include when I arrived, what I observed (bir
       `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens`
     ).join('\n');
 
-    const system = `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
+    // Same day-by-day figures, plus the officer's own notes so the behaviour box can
+    // actually compare the days instead of guessing from bird counts alone.
+    const behaviourContext = days.map((d, i) =>
+      `Day ${i+1} (${d.date}, ${d.start}–${d.end}): ${d.pigeons} pigeons, ${d.mynas} mynas, ${d.crows} crows, ${d.chickens} chickens` +
+      (d.notes ? `\nDay ${i+1} observation notes written by the officer: ${d.notes}` : '')
+    ).join('\n\n');
+
+    // Only "Animal behaviour displayed" is style-matched to past reports; the other
+    // three boxes keep the original generic prompt and the 2–4 sentence instruction.
+    const system = field === 'animalBehaviour'
+      ? `You are an NParks Singapore field surveillance officer filling in the "Animal behaviour displayed" row of an official government Occurrence Book report. Output plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags. Start directly with content.
+
+${BEHAVIOUR_STYLE_EXAMPLES}`
+      : `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
 
     const prompts = {
-      animalBehaviour: `Write the animal behaviour section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe typical pigeon/myna/crow behaviour: perching, foraging, cooing, any feeding by public.`,
+      animalBehaviour: `Write the "Animal behaviour displayed" entry for the bird surveillance at ${location}.\n\n${behaviourContext}\n\nCompare the days against each other and say what the birds appeared to be doing. Keep it to one short paragraph in the same voice as the examples. Use only what is above — do not invent a block number, food source, person or location that is not stated.`,
       possibleHabitats: `Write the possible habitats section for a bird surveillance at ${location}.\n${daysSummary}\nReturn EXACTLY 3 numbered points (1. 2. 3.). Each point is one short line. No intro sentence, no header, no paragraph text — only the 3 numbered points, nothing else before or after.`,
       foodSources: `Write the food sources / evidence of feeding section for a bird surveillance at ${location}.\n${daysSummary}\nDescribe food remnants, refuse areas, note if no deliberate feeders found.`,
       environment: `Write the environment description for a bird surveillance at ${location}.\n${daysSummary}\nDescribe type of building, surroundings, weather.`,
