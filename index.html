@@ -1658,15 +1658,50 @@ Return ONLY the JSON object.`;
     return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
   }
 
+  // ── Image downscaling ──────────────────────────────────────────────────────
+  // iOS Safari decodes an <img> at its full resolution no matter how small it
+  // is displayed, so one 12MP phone photo costs roughly 48 MB of memory. A
+  // three-day report holds dozens on screen at once, which is enough for the
+  // tab to be killed outright ("A problem repeatedly occurred") and take the
+  // unsaved form with it. Everything shown on screen is therefore a downscaled
+  // copy. The untouched original File is kept for resizeForDoc, so nothing
+  // here changes what ends up in the .docx.
+  const THUMB_PX = 480;   // grid thumbnails and the baked annotation preview
+  const ANNOT_PX = 1400;  // source for the annotation canvas
+
+  function downscale(file, maxPx, quality = 0.85) {
+    return new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.onload  = () => {
+        const ratio  = Math.min(maxPx / img.naturalWidth, maxPx / img.naturalHeight, 1);
+        const w      = Math.max(1, Math.round(img.naturalWidth  * ratio));
+        const h      = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(blob => {
+          canvas.width = canvas.height = 0;  // drop the backing store now, not at GC
+          resolve(blob ? URL.createObjectURL(blob) : null);
+        }, 'image/jpeg', quality);
+      };
+      img.src = url;
+    });
+  }
+
   // ── Per-day observation photos ─────────────────────────────────────────────
   let survDayPhotos       = { 1: [], 2: [], 3: [] };
   let survDayAnnotations  = { 1: [], 2: [], 3: [] }; // per-photo rect arrays
 
   async function handleDayPhoto(day, files) {
-    const newPhotos = Array.from(files).map(file => ({
-      file,
-      thumbUrl: URL.createObjectURL(file),
-    }));
+    // One at a time: decoding a dozen full-size photos in parallel is itself
+    // enough to blow the memory ceiling on a phone.
+    const newPhotos = [];
+    for (const file of Array.from(files)) {
+      newPhotos.push({ file, thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
+    }
     survDayPhotos[day] = survDayPhotos[day].concat(newPhotos);
     // extend annotations array to match
     while (survDayAnnotations[day].length < survDayPhotos[day].length)
@@ -1701,13 +1736,18 @@ Return ONLY the JSON object.`;
   let _annotRects = [];   // committed rects [{x1,y1,x2,y2} as fractions 0-1]
   let _annotDrag  = null; // in-progress drag
   let _annotImg   = null;
+  let _annotSrcUrl = null;  // capped working copy the canvas draws from
 
-  function openAnnotate(day, idx) {
+  async function openAnnotate(day, idx) {
     _annotDay  = day;
     _annotIdx  = idx;
     _annotRects = (survDayAnnotations[day][idx] || []).map(r => ({...r}));
 
     const photo = survDayPhotos[day][idx];
+    // A full-resolution decode here, plus a canvas the same size in annotDone,
+    // was the spike that killed the tab on opening this modal.
+    if (_annotSrcUrl) URL.revokeObjectURL(_annotSrcUrl);
+    _annotSrcUrl = await downscale(photo.file, ANNOT_PX);
     const img   = new Image();
     img.onload = () => {
       _annotImg = img;
@@ -1721,7 +1761,7 @@ Return ONLY the JSON object.`;
       _annotDrawAll();
       document.getElementById('annotateModal').classList.add('open');
     };
-    img.src = photo.thumbUrl;
+    img.src = _annotSrcUrl || photo.thumbUrl;
   }
 
   function _annotDrawAll() {
@@ -1807,12 +1847,15 @@ Return ONLY the JSON object.`;
     if (rects.length === 0) {
       photo.annotatedThumbUrl = null;
     } else {
-      // Draw on a canvas and store as a blob URL
-      const canvas = document.createElement('canvas');
-      canvas.width  = _annotImg.naturalWidth;
-      canvas.height = _annotImg.naturalHeight;
+      // This preview is only ever shown at about 210px wide, so bake it small.
+      // The .docx redraws the boxes from the original file in resizeForDoc, so
+      // nothing is lost by not keeping a full-resolution copy here.
+      const ratio   = Math.min(THUMB_PX / _annotImg.naturalWidth, THUMB_PX / _annotImg.naturalHeight, 1);
+      const canvas  = document.createElement('canvas');
+      canvas.width  = Math.max(1, Math.round(_annotImg.naturalWidth  * ratio));
+      canvas.height = Math.max(1, Math.round(_annotImg.naturalHeight * ratio));
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(_annotImg, 0, 0);
+      ctx.drawImage(_annotImg, 0, 0, canvas.width, canvas.height);
       ctx.strokeStyle = '#e74c3c';
       ctx.lineWidth   = Math.max(3, Math.round(canvas.width / 150));
       rects.forEach(r => {
@@ -1820,11 +1863,14 @@ Return ONLY the JSON object.`;
                        (r.x2 - r.x1) * canvas.width, (r.y2 - r.y1) * canvas.height);
       });
       canvas.toBlob(blob => {
-        photo.annotatedThumbUrl = URL.createObjectURL(blob);
+        photo.annotatedThumbUrl = blob ? URL.createObjectURL(blob) : null;
+        canvas.width = canvas.height = 0;
       }, 'image/jpeg', 0.92);
     }
 
     document.getElementById('annotateModal').classList.remove('open');
+    if (_annotSrcUrl) { URL.revokeObjectURL(_annotSrcUrl); _annotSrcUrl = null; }
+    _annotImg = null;
     renderDayThumbs(_annotDay);
   }
 
@@ -1959,12 +2005,21 @@ Return ONLY the JSON object.`;
       if (dr) surveyDays.push({ dateRaw: dr, label: `Day ${i}` });
     }
 
-    const results = await Promise.all(Array.from(files).map(async file => {
-      const ts    = await getPhotoTimestamp(file);
+    // Sequential, and downscaled for display. A whole shift's photos decoded
+    // in parallel at full resolution was the largest memory spike in the app;
+    // this is slower, so the count doubles as a progress line.
+    const countEl = document.getElementById('photoCount');
+    const all     = Array.from(files);
+    const results = [];
+    for (let i = 0; i < all.length; i++) {
+      const file    = all[i];
+      countEl.textContent = `Processing ${i + 1} of ${all.length}…`;
+      const ts      = await getPhotoTimestamp(file);
       const dateStr = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
-      const di    = surveyDays.findIndex(d => d.dateRaw === dateStr);
-      return { file, timestamp: ts, dateStr, slot: slotKey(ts), dayIdx: di, thumbUrl: URL.createObjectURL(file) };
-    }));
+      const di      = surveyDays.findIndex(d => d.dateRaw === dateStr);
+      results.push({ file, timestamp: ts, dateStr, slot: slotKey(ts), dayIdx: di,
+                     thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
+    }
 
     processedPhotos = results.sort((a, b) => a.timestamp - b.timestamp);
     document.getElementById('photoCount').textContent =
