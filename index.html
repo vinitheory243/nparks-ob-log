@@ -383,6 +383,36 @@
     }
     .fast-game-cancel:active { background: #f5f5f5; }
 
+    /* ── Draft notice ───────────────────────────────────────────────────────── */
+    .draft-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      max-width: 860px;
+      margin: 0 auto 12px;
+      padding: 9px 14px;
+      background: #fff8e1;
+      border: 1.5px solid #f0d48a;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.35;
+      color: #7a5d0a;
+    }
+    .draft-bar.show { display: flex; }
+    .draft-bar button {
+      background: none;
+      border: none;
+      color: #7a5d0a;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      white-space: nowrap;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     /* ── Adv Opt: phrases picked from a list instead of typed ────────────────── */
     .label-actions { display: inline-flex; align-items: center; gap: 6px; }
     .btn-adv {
@@ -685,6 +715,11 @@
 
   <div class="page-title">NParks OB Log Generator</div>
   <div class="page-sub">Fill in the report details, then add your surveillance photos to generate the .docx file.</div>
+
+  <div class="draft-bar" id="draftBar">
+    <span id="draftBarText"></span>
+    <button onclick="clearDraft()">Start a new report</button>
+  </div>
 
   <!-- Step progress bar -->
   <div class="step-bar">
@@ -1447,6 +1482,75 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     return out;
   }
 
+  // ── Draft autosave ─────────────────────────────────────────────────────────
+  // The tab can die at any moment — out of memory, or iOS simply evicting a
+  // backgrounded page — and everything typed goes with it. Text is cheap to
+  // keep, so every field is mirrored to localStorage as it is typed and put
+  // back on the next load. Photos are File handles and cannot be kept, so the
+  // banner says so outright rather than letting the officer assume otherwise.
+  const DRAFT_KEY = 'nparks-ob-log-draft-v1';
+  let _draftTimer = null;
+
+  function draftFields() {
+    return [...document.querySelectorAll('input[id], textarea[id], select[id]')]
+      .filter(el => el.type !== 'file' && el.id !== 'fastGameText' && !el.id.startsWith('advOpt'));
+  }
+
+  function saveDraft() {
+    const values = {};
+    draftFields().forEach(el => { if (el.value !== '') values[el.id] = el.value; });
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        savedAt:  Date.now(),
+        caseType: currentCaseType,
+        values,
+      }));
+    } catch (err) {
+      // Private browsing or quota. Autosave is a safety net, never a blocker.
+    }
+  }
+
+  function scheduleDraftSave() {
+    clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(saveDraft, 600);
+  }
+
+  function restoreDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (err) { return; }
+    if (!d || !d.values || !Object.keys(d.values).length) return;
+
+    if (d.caseType && CASE_TYPES[d.caseType]) {
+      currentCaseType = d.caseType;
+      document.getElementById('caseType').value = d.caseType;
+      applyCaseType(false);
+    }
+    const apply = () => Object.entries(d.values).forEach(([id, v]) => {
+      const el = document.getElementById(id);
+      if (el && el.type !== 'file') el.value = v;
+    });
+    // Applied twice with a re-layout between: a dog report's hourly blocks only
+    // exist once the shift times are back, so the first pass restores the times
+    // and the second fills the textareas that laying them out created.
+    apply();
+    for (let i = 1; i <= 3; i++) renderNotes(i);
+    apply();
+
+    const mins = Math.round((Date.now() - d.savedAt) / 60000);
+    const when = mins < 1    ? 'a moment ago'
+               : mins < 60   ? `${mins} min ago`
+               : mins < 1440 ? `${Math.round(mins / 60)} h ago`
+               : 'earlier';
+    document.getElementById('draftBarText').textContent =
+      `Draft restored from ${when} — photos are not saved and need to be added again.`;
+    document.getElementById('draftBar').classList.add('show');
+  }
+
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+    location.reload();
+  }
+
   // ── adv opt ────────────────────────────────────────────────────────────────
   // The phrases go into the notes box verbatim and unpolished — Generate is
   // what turns them into report prose, so this only has to save typing.
@@ -1790,7 +1894,12 @@ Return ONLY the JSON object.`;
   }
 
   // Build the case-type dropdown and render Cards 3 and 4 for the default type.
-  document.addEventListener('DOMContentLoaded', initCaseTypes);
+  document.addEventListener('DOMContentLoaded', () => {
+    initCaseTypes();
+    restoreDraft();
+    document.addEventListener('input',  scheduleDraftSave, true);
+    document.addEventListener('change', scheduleDraftSave, true);
+  });
 
   document.addEventListener('DOMContentLoaded', function attachAnnotEvents() {
     const canvas = document.getElementById('annotateCanvas');

@@ -22,7 +22,11 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  FAIL ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
-const dom = new JSDOM(HTML, { runScripts: 'dangerously', pretendToBeVisual: true });
+// A real origin, not the default opaque one: localStorage throws a SecurityError
+// on an opaque origin, and the draft autosave needs it. The app itself guards
+// every localStorage call, which is the same path private browsing takes.
+const dom = new JSDOM(HTML, { runScripts: 'dangerously', pretendToBeVisual: true,
+                              url: 'https://nparks-ob-log.vercel.app/' });
 const { window } = dom;
 const doc = window.document;
 window.alert = (m) => { throw new Error('alert(): ' + m); };
@@ -193,5 +197,26 @@ ok('bird defaults restored', $('petOwners').value === 'Nil');
 ok('bird brief back to 4 points', window.buildBriefPoints().length === 4);
 ok('Adv Opt button back on bird', doc.querySelectorAll('#daysContainer .btn-adv').length === 3);
 
+
+console.log('\n=== DRAFT AUTOSAVE ===');
+setv('caseId', 'NPARKS-DRAFT-1');
+setv('location', 'Blk 99 void deck');
+setv('day1Notes', 'draft notes must survive a crash');
+setv('day1Pigeons', '14');   // reset to 0 by the dog round-trip above
+window.saveDraft();
+const stored = JSON.parse(window.localStorage.getItem('nparks-ob-log-draft-v1'));
+ok('draft written to localStorage', !!stored && stored.values.caseId === 'NPARKS-DRAFT-1');
+ok('draft records the case type', stored.caseType === 'bird');
+ok('draft does not store file inputs', !('day1ObsPhotos' in stored.values));
+
+// wipe the live form the way a crash and reload would, then restore
+setv('caseId', ''); setv('location', ''); setv('day1Notes', ''); setv('day1Pigeons', '0');
+window.restoreDraft();
+ok('caseId restored', $('caseId').value === 'NPARKS-DRAFT-1', $('caseId').value);
+ok('location restored', $('location').value === 'Blk 99 void deck');
+ok('notes restored', $('day1Notes').value === 'draft notes must survive a crash', $('day1Notes').value);
+ok('counts restored', $('day1Pigeons').value === '14', $('day1Pigeons').value);
+ok('banner shown after a restore', $('draftBar').classList.contains('show'));
+ok('banner warns photos are gone', $('draftBarText').textContent.includes('photos are not saved'));
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
