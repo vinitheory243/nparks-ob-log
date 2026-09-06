@@ -383,6 +383,8 @@
     }
     .fast-game-cancel:active { background: #f5f5f5; }
 
+    .prev-thumb .time-guessed { color: #b7791f; font-weight: 700; }
+
     /* ── Draft notice ───────────────────────────────────────────────────────── */
     .draft-bar {
       display: none;
@@ -1285,9 +1287,13 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     if (!start || !end) return [];
     const [sh, sm] = start.split(':').map(Number);
     const [eh, em] = end.split(':').map(Number);
-    let from = sh * 60 + sm;
-    const to = eh * 60 + em;
-    if (!(to > from)) return [];
+    let from  = sh * 60 + sm;
+    let to    = eh * 60 + em;
+    if (to === from) return [];
+    // An end time at or before the start means the shift runs past midnight —
+    // a 2230 to 0130 patrol used to produce no blocks at all, leaving the
+    // officer with nowhere to type. hhmm() wraps the labels back round.
+    if (to < from) to += 24 * 60;
     const out = [];
     while (from < to && out.length < 12) {
       const next = Math.min(from + 60, to);
@@ -1306,8 +1312,34 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
   }
 
   function onCaseTypeChange() {
-    currentCaseType = document.getElementById('caseType').value;
+    const sel  = document.getElementById('caseType');
+    const next = sel.value;
+    // applyCaseType(true) rewrites all six summary boxes with the new type's
+    // template and resets the shift times, so a mistaken tap on the dropdown
+    // used to wipe a part-written report with no warning and no way back.
+    if (next !== currentCaseType && formHasContent() && !confirm(
+      'Switching case type replaces the six summary boxes with the template for the new type, ' +
+      'and resets the shift times. Anything written in them will be lost.' + BLANK_LINE +
+      'Switch anyway?')) {
+      sel.value = currentCaseType;
+      return;
+    }
+    currentCaseType = next;
     applyCaseType(true);
+  }
+
+  // Has the officer put anything in this form yet? Used only to decide whether
+  // switching case type is worth interrupting for.
+  function formHasContent() {
+    if (['caseId', 'location', 'activatingOfficer'].some(id => optVal(id))) return true;
+    for (let i = 1; i <= 3; i++) {
+      if (optVal(`day${i}Date`) || optVal(`day${i}Notes`)) return true;
+      for (let b = 0; b < 12; b++) if (optVal(`day${i}Block${b}`)) return true;
+    }
+    return caseType().summaryFields.some(f => {
+      const el = document.getElementById(f.key);
+      return el && el.value.trim() !== String(f.default || '').trim();
+    });
   }
 
   function applyCaseType(reset) {
@@ -1546,8 +1578,16 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     document.getElementById('draftBar').classList.add('show');
   }
 
-  function clearDraft() {
+  // Drop the draft without disturbing the form. Autosave starts again on the
+  // next keystroke, so this is safe to call the moment a report is filed.
+  function discardDraft() {
     try { localStorage.removeItem(DRAFT_KEY); } catch (err) {}
+    clearTimeout(_draftTimer);
+    document.getElementById('draftBar').classList.remove('show');
+  }
+
+  function clearDraft() {
+    discardDraft();
     location.reload();
   }
 
@@ -1643,6 +1683,9 @@ Return ONLY the JSON object.`;
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      if (data.stop_reason === 'max_tokens') {
+        throw new Error('The reply was cut off before it finished. Try again with fewer notes at once.');
+      }
 
       // Strip accidental markdown fences
       let raw = data.content[0].text.trim().replace(/^```json\s*/i, '').replace(/```\s*$/,'');
@@ -1688,7 +1731,28 @@ Return ONLY the JSON object.`;
     }
   }
 
-  function showToast(msg) {
+  // The last Generate, kept so it can be stepped back. One entry per field, so
+  // an hourly rewrite that touched five blocks is undone as a single action.
+  let _lastGenerate = null;
+
+  function rememberForUndo(entries) {
+    _lastGenerate = entries.length ? entries : null;
+  }
+
+  function undoLastGenerate() {
+    if (!_lastGenerate) return;
+    _lastGenerate.forEach(e => {
+      const el = document.getElementById(e.id);
+      if (el) el.value = e.prev;
+    });
+    _lastGenerate = null;
+    scheduleDraftSave();
+    showToast('Put back your original notes.');
+  }
+
+  const UNDO_ACTION = { label: '↩ Undo', fn: () => undoLastGenerate() };
+
+  function showToast(msg, action) {
     const t = document.createElement('div');
     t.textContent = msg;
     Object.assign(t.style, {
@@ -1698,8 +1762,20 @@ Return ONLY the JSON object.`;
       zIndex: '999', boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
       transition: 'opacity 0.4s',
     });
+    if (action) {
+      const b = document.createElement('button');
+      b.textContent = action.label;
+      Object.assign(b.style, {
+        marginLeft: '14px', background: 'rgba(255,255,255,0.2)', color: '#fff',
+        border: 'none', borderRadius: '50px', padding: '5px 12px',
+        fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+      });
+      b.onclick = () => { action.fn(); t.remove(); };
+      t.appendChild(b);
+    }
     document.body.appendChild(t);
-    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2500);
+    // An undo needs longer on screen than a plain confirmation.
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, action ? 7000 : 2500);
   }
 
   // ── officer lookup ─────────────────────────────────────────────────────────
@@ -1724,6 +1800,10 @@ Return ONLY the JSON object.`;
   }
 
   // ── helpers ────────────────────────────────────────────────────────────────
+  // A blank line inside an alert(). Kept as a constant so the source never has
+  // to carry an escape sequence through the tooling that writes this file.
+  const BLANK_LINE = String.fromCharCode(10, 10);
+
   function val(id) { return document.getElementById(id).value.trim(); }
   // Same as val(), but for fields that only exist on some case types.
   function optVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
@@ -2048,15 +2128,21 @@ Return ONLY the JSON object.`;
     } catch (_) { return ''; }
   }
 
+  // Returns the time AND where it came from. Every photo is filed into the
+  // report by this timestamp, so when it is only a guess the officer must see it.
   async function getPhotoTimestamp(file) {
     // 1. Read EXIF directly from file bytes (no CDN)
     const exifDate = await readExifDate(file);
-    if (exifDate) return exifDate;
+    if (exifDate) return { date: exifDate, source: 'exif' };
     // 2. Try filename pattern: IMG_20260519_113045.jpg or 20260519_113045.jpg
     const m = file.name.match(/(\d{4})(\d{2})(\d{2})[_\-](\d{2})(\d{2})(\d{2})/);
-    if (m) return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
-    // 3. Fall back to file modified time
-    return new Date(file.lastModified);
+    if (m) return { date: new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]), source: 'filename' };
+    // 3. Fall back to the file's modified time. readExifDate needs a JPEG
+    // header, so a HEIC that Safari did not convert on upload lands here, as
+    // does any copy whose metadata was stripped. That time is often when the
+    // file was copied rather than when the photo was taken, which would file it
+    // into the wrong 15-minute slot or the wrong day — so the preview flags it.
+    return { date: new Date(file.lastModified), source: 'filemtime' };
   }
 
   function slotKey(date) {
@@ -2071,11 +2157,19 @@ Return ONLY the JSON object.`;
     return `${slot.slice(0,2)}${slot.slice(2)} hrs`;
   }
 
+  let _photoFailures = 0;   // counted per generateDoc run, reported at the end
+
   async function resizeForDoc(file, rects) {
     return new Promise(resolve => {
       const img = new Image();
       const url = URL.createObjectURL(file);
-      img.onerror = () => { URL.revokeObjectURL(url); resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 }); };
+      img.onerror = () => {
+        // Zero-length buffers are filtered out of the document further down, so
+        // without this counter the photo would simply be missing from the report.
+        _photoFailures++;
+        URL.revokeObjectURL(url);
+        resolve({ buf: new ArrayBuffer(0), w: 200, h: 150 });
+      };
       img.onload = () => {
         URL.revokeObjectURL(url);
         const cRatio = Math.min(1200 / img.naturalWidth, 1200 / img.naturalHeight, 1);
@@ -2123,10 +2217,12 @@ Return ONLY the JSON object.`;
     for (let i = 0; i < all.length; i++) {
       const file    = all[i];
       countEl.textContent = `Processing ${i + 1} of ${all.length}…`;
-      const ts      = await getPhotoTimestamp(file);
+      const stamp   = await getPhotoTimestamp(file);
+      const ts      = stamp.date;
       const dateStr = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
       const di      = surveyDays.findIndex(d => d.dateRaw === dateStr);
       results.push({ file, timestamp: ts, dateStr, slot: slotKey(ts), dayIdx: di,
+                     timeSource: stamp.source,
                      thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
     }
 
@@ -2165,13 +2261,17 @@ Return ONLY the JSON object.`;
           html += `<div class="prev-thumb">
             <button class="thumb-remove" onclick="removePhoto(${idx})" title="Remove">×</button>
             <img src="${p.thumbUrl}" loading="lazy" />
-            <span>${exact}</span>
+            <span class="${p.timeSource === 'filemtime' ? 'time-guessed' : ''}">${p.timeSource === 'filemtime' ? '⚠ ' : ''}${exact}</span>
           </div>`;
         });
         html += `</div></div>`;
       });
       html += `</div>`;
     });
+    const guessed = processedPhotos.filter(p => p.timeSource === 'filemtime').length;
+    if (guessed) {
+      html += `<p class="hint" style="color:#b7791f;">⚠ ${guessed} photo${guessed > 1 ? 's carry' : ' carries'} no timestamp of ${guessed > 1 ? 'their' : 'its'} own, so the file date is being used and may be when it was copied rather than taken. Check those times before generating.</p>`;
+    }
     container.innerHTML = html;
   }
 
@@ -2206,6 +2306,11 @@ Return ONLY the JSON object.`;
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      // A reply that hit the token ceiling stops mid-sentence. Refuse it rather
+      // than dropping half a sentence into an official report.
+      if (data.stop_reason === 'max_tokens') {
+        throw new Error('The reply was cut off before it finished. Shorten the rough notes for this block and try again.');
+      }
       return data.content[0].text.trim();
     } finally {
       btn.disabled = false;
@@ -2218,6 +2323,9 @@ Return ONLY the JSON object.`;
   // the model is never asked to decide which hour something happened in — it only
   // ever rewrites the block the officer already put that observation in.
   async function generateDayNotes(day, btn) {
+    const origLabel = btn.textContent;
+    const undoEntries = [];
+    let rewritten   = 0, toRewrite = 0;
     const t        = caseType();
     const location = val('location') || 'the activation site';
     const days     = collectDays();
@@ -2243,8 +2351,12 @@ Counts: ${t.countSummary(d)}`;
         const prompt = existing
           ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.\n\nShift details:\n${shift}\n\nOfficer's rough notes to rephrase:\n${existing}`
           : `Write my first-person observation notes for this surveillance shift.\n\n${shift}\n\n${t.notesBrief} Do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
+        const el   = document.getElementById(`day${day}Notes`);
+        const prev = el.value;
         const text = await callClaude(system, prompt, btn);
-        document.getElementById(`day${day}Notes`).value = text;
+        el.value = text;
+        rememberForUndo([{ id: el.id, prev }]);
+        showToast('Notes rewritten.', UNDO_ACTION);
         return;
       }
 
@@ -2252,7 +2364,7 @@ Counts: ${t.countSummary(d)}`;
       const filled = d.blocks.map((b, i) => ({ ...b, i })).filter(b => b.text);
       if (!filled.length) { alert('Type some rough notes into at least one hourly block first.'); return; }
 
-      const orig = btn.textContent;
+      toRewrite = filled.length;
       btn.disabled = true;
       for (let k = 0; k < filled.length; k++) {
         const b = filled[k];
@@ -2274,14 +2386,25 @@ ${b.text}`;
         // callClaude manages the button label, so hand it a stub to leave ours alone.
         const stub = { disabled: false, textContent: '' };
         const text = await callClaude(system, prompt, stub);
-        document.getElementById(`day${day}Block${b.i}`).value = text;
+        const el   = document.getElementById(`day${day}Block${b.i}`);
+        undoEntries.push({ id: el.id, prev: el.value });
+        el.value = text;
+        rewritten++;
       }
-      btn.textContent = orig;
+      btn.textContent = origLabel;
       btn.disabled = false;
-      showToast('Hourly blocks rewritten.');
+      rememberForUndo(undoEntries);
+      showToast('Hourly blocks rewritten.', UNDO_ACTION);
     } catch (err) {
       btn.disabled = false;
-      alert('AI generation failed: ' + err.message);
+      btn.textContent = origLabel;   // otherwise it reads "2/3…" for good
+      rememberForUndo(undoEntries);  // a partial rewrite is still undoable
+      // One call per block, so a drop-out mid-loop leaves some blocks rewritten
+      // and some raw. Say which, rather than leaving the officer to guess.
+      const partial = rewritten
+        ? BLANK_LINE + `${rewritten} of ${toRewrite} blocks were rewritten before this failed and have been kept. The rest are still your original notes.`
+        : '';
+      alert('AI generation failed: ' + err.message + partial);
     }
   }
 
@@ -2318,8 +2441,12 @@ ${context}
 ${spec.brief} Use only what is above — do not invent a block number, food source, person or location that is not stated.`;
 
     try {
+      const el   = document.getElementById(field);
+      const prev = el.value;
       const text = await callClaude(system, prompt, btn);
-      document.getElementById(field).value = text;
+      el.value = text;
+      rememberForUndo([{ id: field, prev }]);
+      showToast('Rewritten.', UNDO_ACTION);
     } catch (err) {
       alert('AI generation failed: ' + err.message);
     }
@@ -2545,6 +2672,7 @@ ${spec.brief} Use only what is above — do not invent a block number, food sour
 
     btn.textContent = 'Generating…';
     btn.disabled = true;
+    _photoFailures = 0;
 
     try {
       const D = window.docx;
@@ -2821,7 +2949,19 @@ ${spec.brief} Use only what is above — do not invent a block number, food sour
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Revoking synchronously can abort the download before the browser has
+      // read the blob; it is freed on the next page load regardless.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+      // The report is filed, so the draft has done its job. Anything typed
+      // after this point starts a fresh one.
+      discardDraft();
+
+      if (_photoFailures) {
+        const many = _photoFailures > 1;
+        alert(`${_photoFailures} photo${many ? 's' : ''} could not be read and ${many ? 'were' : 'was'} left out of the report.`
+            + BLANK_LINE + 'Check the .docx before submitting it.');
+      }
 
     } catch (err) {
       console.error(err);

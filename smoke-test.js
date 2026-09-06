@@ -30,6 +30,9 @@ const dom = new JSDOM(HTML, { runScripts: 'dangerously', pretendToBeVisual: true
 const { window } = dom;
 const doc = window.document;
 window.alert = (m) => { throw new Error('alert(): ' + m); };
+// Case-type switching asks for confirmation once the form has content; default
+// to yes so the existing switch assertions still exercise the switch itself.
+window.confirm = () => true;
 const opened = [];
 window.open = () => ({ document: { write: (h) => opened.push(h), close() {} } });
 
@@ -218,5 +221,53 @@ ok('notes restored', $('day1Notes').value === 'draft notes must survive a crash'
 ok('counts restored', $('day1Pigeons').value === '14', $('day1Pigeons').value);
 ok('banner shown after a restore', $('draftBar').classList.contains('show'));
 ok('banner warns photos are gone', $('draftBarText').textContent.includes('photos are not saved'));
-console.log(`\n${pass} passed, ${fail} failed\n`);
-process.exit(fail ? 1 : 0);
+console.log('=== EDGE CASES ===');
+
+// a shift running past midnight must still lay out hourly blocks
+const mid = window.hourBlocks('22:30', '01:30');
+ok('midnight shift produces blocks', mid.length === 3, JSON.stringify(mid.map(b => b.label)));
+ok('midnight block labels wrap correctly',
+   mid.map(b => b.label).join('|') === '2230–2330 hrs|2330–0030 hrs|0030–0130 hrs',
+   mid.map(b => b.label).join('|'));
+ok('a zero-length shift still produces nothing', window.hourBlocks('11:30', '11:30').length === 0);
+ok('an ordinary shift is unaffected', window.hourBlocks('11:30', '14:30').length === 3);
+
+// changing case type is destructive, so a declined confirmation must not switch
+ok('form is seen as having content', window.formHasContent() === true);
+window.confirm = () => false;
+$('caseType').value = 'dog';
+window.onCaseTypeChange();
+ok('declining the confirm keeps the case type', $('caseType').value === 'bird', $('caseType').value);
+ok('declining the confirm keeps the bird fields', !!$('day1Pigeons') && !$('day1Leashed'));
+window.confirm = () => true;
+
+// one step back from a Generate
+setv('day1Notes', 'my own rough words');
+window.rememberForUndo([{ id: 'day1Notes', prev: 'my own rough words' }]);
+setv('day1Notes', 'the AI version that came back worse');
+window.undoLastGenerate();
+ok('undo puts the original notes back', $('day1Notes').value === 'my own rough words', $('day1Notes').value);
+window.undoLastGenerate();
+ok('undo a second time is harmless', $('day1Notes').value === 'my own rough words');
+
+// filing the report must clear the draft, or it comes back as the next report
+window.saveDraft();
+ok('draft exists before filing', !!window.localStorage.getItem('nparks-ob-log-draft-v1'));
+window.discardDraft();
+ok('draft cleared when the report is filed', !window.localStorage.getItem('nparks-ob-log-draft-v1'));
+ok('banner hidden after clearing', !$('draftBar').classList.contains('show'));
+
+(async () => {
+  // a photo with no EXIF but a dated filename should say where its time came from
+  const named = new window.File(['not a jpeg'], 'IMG_20260519_113045.jpg', { type: 'image/jpeg' });
+  const stamp = await window.getPhotoTimestamp(named);
+  ok('timestamp reports its source', stamp.source === 'filename', stamp.source);
+  ok('timestamp read from the filename', stamp.date.getHours() === 11 && stamp.date.getDate() === 19);
+
+  const bare  = new window.File(['nothing'], 'photo.jpg', { type: 'image/jpeg' });
+  const guess = await window.getPhotoTimestamp(bare);
+  ok('a photo with no time at all is flagged', guess.source === 'filemtime', guess.source);
+
+  console.log(`\n${pass} passed, ${fail} failed\n`);
+  process.exit(fail ? 1 : 0);
+})();
