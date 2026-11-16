@@ -972,7 +972,21 @@
         'Feeding on prayer food',
         'Activation timing was not good',
         'Feeder is most likely active at another time',
+        'Saw some food sources but before surveillance period',
+        'Gathering but not feeding',
+        'I ended the surveillance with no active feeder caught',
+        'Heavy rain',
+        'Started drizzling halfway',
       ],
+      // Used only when the notes contain phrases picked from the list above.
+      // Those are a few stock words each, and a plain rephrase came back as
+      // two thin sentences, so this asks for a full paragraph instead.
+      quickPhraseExpand: `These rough notes are made of short stock phrases the officer picked from a list. Each phrase is shorthand, so write it out properly:
+- Give every phrase one or two full sentences of its own, in the order they appear, joined so the whole thing reads as one proper paragraph of about 6 to 9 sentences. For this request ignore the house rule about keeping a quiet shift short.
+- Spell out what the phrase means for the shift: what I did, what I saw, and what I make of it. Ordinary filler that follows straight from the phrase is fine (that I walked around the area, that I kept watching for the rest of the shift, that nothing changed).
+- What the shorthand means: "Feeding but natural sources" means the birds were eating what is naturally there, not food left by a person (do not name what the natural source was). "Saw some food sources but before surveillance period" means food was already lying there when I arrived, put there before my shift, so I did not see who left it. "Gathering but not feeding" means the birds were grouped together but not eating. "Activation timing was not good" means the hours I was told to come do not seem to be when the feeding happens. "General litter" means ordinary rubbish around, not food put out for birds.
+- Still do NOT invent a block number, a place name, a count, a person or a type of food, and do not say how long something lasted unless the phrase says so ("Heavy rain" is not "heavy rain throughout the shift"). If a phrase does not say it, do not add it.
+- Write it the way a working officer types on a phone. Everyday words only: saw, walked, looked, checked, waited, stayed, left, came, went. Do not use words like commenced, subsequently, vicinity, numerous, evident, indicating, conducted, proceeded, approximately, vigilant, persisted, peak, capturing or throughout the duration. Sentences can be a bit loose. It must not read like an AI or a press release wrote it.`,
       // Backstop for the rule in the house style below: if the model writes the
       // zero-count recital anyway, the sentence is cut before it reaches the box.
       notesStrip: /\s*My bird count for the shift recorded[^.]*\./gi,
@@ -2389,8 +2403,10 @@ Counts: ${t.countSummary(d)}`;
         // every count is 0 the rough notes are the only source for numbers.
         const allZero = t.counts.every(c => d.c[c.key] === '0');
         const shiftForNotes = allZero ? shift.replace(/\nCounts: .*$/, '') : shift;
+        const usedPhrases = !!t.quickPhraseExpand && (t.quickPhrases || [])
+          .some(p => existing.toLowerCase().includes(p.toLowerCase()));
         const prompt = existing
-          ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.${allZero ? ' No bird counts were entered, so do not state any numbers that are not in the rough notes.' : ''}\n\nShift details:\n${shiftForNotes}\n\nOfficer's rough notes to rephrase:\n${existing}`
+          ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.${allZero ? ' No bird counts were entered, so do not state any numbers that are not in the rough notes.' : ''}${usedPhrases ? '\n\n' + t.quickPhraseExpand : ''}\n\nShift details:\n${shiftForNotes}\n\nOfficer's rough notes to rephrase:\n${existing}`
           : `Write my first-person observation notes for this surveillance shift.\n\n${shift}\n\n${t.notesBrief} Do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
         const el   = document.getElementById(`day${day}Notes`);
         const prev = el.value;
