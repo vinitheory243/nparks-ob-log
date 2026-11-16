@@ -786,6 +786,7 @@
           <option value="Vinith Kumar">Vinith Kumar</option>
           <option value="Bhavana Krishna">Bhavana Krishna</option>
           <option value="Tharish Kumar">Tharish Kumar</option>
+          <option value="Asween Kumar">Asween Kumar</option>
         </select>
       </div>
       <div class="form-group">
@@ -799,6 +800,12 @@
   <!-- Card 3: Surveillance Days -->
   <div class="card">
     <div class="card-title"><span class="badge">3</span> Surveillance Days</div>
+    <div class="day-photo-wrap" style="margin-bottom:16px;">
+      <label class="btn-day-photo" for="photoInputDays">📷 Fill days from photos</label>
+      <input type="file" id="photoInputDays" multiple accept="image/*"
+        style="display:none" onchange="handlePhotoSelect(this.files, true)" />
+      <p class="hint" id="daysPhotoStatus" style="margin-top:8px;">Add all the surveillance photos here and the dates and shift times fill themselves. The same photos go into the report, so they do not need adding again in step 2.</p>
+    </div>
     <p class="hint" style="margin-bottom:16px;">Days 2 and 3 are optional — leave the date blank to skip them.</p>
 
     <div id="daysContainer"></div>
@@ -809,7 +816,7 @@
     <div class="card-title">
       <span class="badge">4</span> Summary of Observations
     </div>
-    <p class="hint" style="margin-bottom:16px;">Pre-filled with standard template text — click Generate on each box to tailor it to this report, or edit manually.</p>
+    <p class="hint" style="margin-bottom:16px;">Pre-filled with standard template text where there is one. Edit each box to fit this report.</p>
     <div id="summaryContainer" class="grid" style="gap:16px;"></div>
   </div>
 
@@ -972,6 +979,9 @@
         'Activation timing was not good',
         'Feeder is most likely active at another time',
       ],
+      // Backstop for the rule in the house style below: if the model writes the
+      // zero-count recital anyway, the sentence is cut before it reaches the box.
+      notesStrip: /\s*My bird count for the shift recorded[^.]*\./gi,
       notesBrief: 'Cover the counts, where the birds were and what they were doing, and whether any feeding, food remains or litter was present. Do not narrate arriving or leaving.',
       notesExamples: `Below are observation notes from OB logs that were submitted and accepted. Match this voice — the sentence rhythm, the hedging, the level of detail, the plainness.
 
@@ -994,7 +1004,7 @@ During this period, I counted a total of 17 pigeons, 4 mynas, 2 crows, and 4 chi
 </example>
 
 <example>
-I remained in the area and did not go into the insides of the estate, as I was specifically monitoring for the group of students referenced in the excel spreadsheet. However, neither the students nor any bird activity was observed during this period. My bird count for the shift recorded zero pigeons, zero mynas, zero crows, and zero chickens across the entire observation area. Saw 1 piece of litter.
+I remained in the area and did not go into the insides of the estate, as I was specifically monitoring for the group of students referenced in the excel spreadsheet. However, neither the students nor any bird activity was observed during this period. Saw 1 piece of litter.
 </example>
 
 <example>
@@ -1015,6 +1025,7 @@ I saw about 5 pigeons, 2 mynas, and 1 crow in the area, with no chickens sighted
 
 House rules drawn from the examples above:
 - State counts hedged — "about 14 pigeons", not an exact-sounding figure. A species with none is "no chickens sighted" or "0 mynas".
+- Never write a sentence that recites a zero for every species, and never write "My bird count for the shift recorded". If no birds were seen at all, say so once in plain words ("I did not see any birds") and move on.
 - One or two short paragraphs. On a quiet shift a single short paragraph is correct — do not pad.
 - Say where the birds actually were, and account for litter or food sources, including saying plainly when there were none.
 - Hedge where you are unsure: "appeared to be", "I could not determine whether", "based on my observations".
@@ -1468,10 +1479,7 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     document.querySelectorAll('#summaryContainer textarea').forEach(el => { keep[el.id] = el.value; });
     document.getElementById('summaryContainer').innerHTML = t.summaryFields.map(f => `
       <div class="form-group">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
-          <label style="margin-bottom:0;">${f.formLabel}</label>
-          ${f.ai ? `<button class="btn-ai" onclick="generateSection('${f.key}', this)">✦ Generate</button>` : ''}
-        </div>
+        <label>${f.formLabel}</label>
         <textarea id="${f.key}" rows="${f.rows}"></textarea>
       </div>`).join('');
     t.summaryFields.forEach(f => {
@@ -1638,8 +1646,39 @@ House rules: begin with "Nil." when nobody was engaged, then state plainly why i
     document.getElementById('fastGameText').value = '';
   }
 
+  // A row copied out of the activation spreadsheet arrives as tab-separated
+  // cells, with any multi-line cell wrapped in double quotes. Columns P and Q
+  // (the surveillance brief and the remark beside it) must never reach the
+  // report, so they are cut out here, before the AI ever sees the text, rather
+  // than asking the AI to ignore them. Counted from column A, so the copy has
+  // to start at column A. Text with no tabs was typed by hand and is left alone.
+  const EXCEL_SKIP_COLS = [15, 16];   // zero-based: P and Q
+
+  function stripExcelColumns(text) {
+    if (!text.includes('\t')) return text;
+    const rows = [[]];
+    let cell = '', quoted = false, atStart = true;
+    const endCell = () => { rows[rows.length - 1].push(cell); cell = ''; atStart = true; };
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (ch === '"') quoted = false;
+        else cell += ch;
+      } else if (ch === '"' && atStart) { quoted = true; atStart = false; }
+      else if (ch === '\t') endCell();
+      else if (ch === '\n') { endCell(); rows.push([]); }
+      else if (ch !== '\r') { cell += ch; atStart = false; }
+    }
+    endCell();
+    return rows
+      .map(r => r.filter((_, i) => !EXCEL_SKIP_COLS.includes(i)).join('\t'))
+      .join('\n')
+      .trim();
+  }
+
   async function submitFastGame() {
-    const text = document.getElementById('fastGameText').value.trim();
+    const text = stripExcelColumns(document.getElementById('fastGameText').value).trim();
     if (!text) return;
 
     const btn = document.querySelector('.fast-game-submit');
@@ -1662,7 +1701,7 @@ Fields to extract (only include fields clearly mentioned):
 - location: string${t.showActivationType ? '\n- activationType: "Urgent" or "Non-Urgent"' : ''}
 - activatingOfficer: string
 - activationDate: YYYY-MM-DD
-- officerName: string (only "Vinith Kumar", "Bhavana Krishna", or "Tharish Kumar" if recognisable)
+- officerName: string (only one of ${Object.keys(OFFICERS).map(n => `"${n}"`).join(', ')} if recognisable)
 - days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", ${dayKeys}, notes: string }
 ${t.summaryFields.map(f => `- ${f.key}: string`).join('\n')}
 
@@ -1783,6 +1822,7 @@ Return ONLY the JSON object.`;
     'Vinith Kumar':   '81198326',
     'Bhavana Krishna': '83636240',
     'Tharish Kumar':   '91698695',
+    'Asween Kumar':    '88352965',
   };
   function autoEndTime(day) {
     const startEl = document.getElementById(`day${day}Start`);
@@ -2199,32 +2239,92 @@ Return ONLY the JSON object.`;
     });
   }
 
-  async function handlePhotoSelect(files) {
+  // "15:32" style value for a time input, snapped to the nearest 15 minutes.
+  function roundTo15(date) {
+    const k = slotKey(date);
+    return `${k.slice(0, 2)}:${k.slice(2)}`;
+  }
+
+  // Photos first: the photos already know which days were worked and when each
+  // shift started and ended, so the Day 1 to 3 dates and times are read off
+  // them instead of typed. Each distinct date becomes a day, in order; the
+  // earliest photo of the date gives the start and the latest gives the end.
+  // Photos whose time is only the file date (see getPhotoTimestamp) are left
+  // out, since that is often when the file was copied. Returns a line saying
+  // what was done, which is shown under the button.
+  function autofillDaysFromPhotos(photos) {
+    const usable  = photos.filter(p => p.timeSource !== 'filemtime');
+    const skipped = photos.length - usable.length;
+    if (!usable.length) {
+      return 'None of these photos carry their own timestamp, so the dates and times could not be filled. Enter them by hand.';
+    }
+    const byDate = {};
+    usable.forEach(p => { (byDate[p.dateStr] = byDate[p.dateStr] || []).push(p.timestamp.getTime()); });
+    const dates = Object.keys(byDate).sort();
+    const used  = dates.slice(0, 3);
+
+    const hasDates = [1, 2, 3].some(n => optVal(`day${n}Date`));
+    if (hasDates && !confirm(
+      'Replace the dates and shift times already entered with the ones read from the photos?' +
+      BLANK_LINE + 'Notes and counts are not touched.')) {
+      return 'Dates and times left as they were.';
+    }
+
+    const parts = [];
+    for (let n = 1; n <= 3; n++) {
+      const ds = used[n - 1];
+      document.getElementById(`day${n}Date`).value = ds || '';
+      if (!ds) continue;
+      const start = roundTo15(new Date(Math.min(...byDate[ds])));
+      const end   = roundTo15(new Date(Math.max(...byDate[ds])));
+      document.getElementById(`day${n}Start`).value = start;
+      if (end === start) autoEndTime(n);              // one photo: assume the usual 3 hours
+      else document.getElementById(`day${n}End`).value = end;
+      renderNotes(n);                                 // hourly blocks follow the shift times
+      parts.push(`Day ${n}: ${fmtDateShort(ds)}, ${fmtTime(start)} to ${fmtTime(document.getElementById(`day${n}End`).value)}`);
+    }
+    scheduleDraftSave();
+
+    let msg = `Filled from ${usable.length} photo${usable.length !== 1 ? 's' : ''}. ${parts.join('. ')}. Check these before carrying on.`;
+    if (dates.length > 3) msg += ` The photos cover ${dates.length} dates, so only the first 3 were used.`;
+    if (skipped) msg += ` ${skipped} photo${skipped !== 1 ? 's have' : ' has'} no timestamp and ${skipped !== 1 ? 'were' : 'was'} not used for this.`;
+    return msg;
+  }
+
+  // fillDays is true when the photos were added from Card 3, before the days
+  // were typed. Either way this is the one photo set the report is built from.
+  async function handlePhotoSelect(files, fillDays) {
+    const all = Array.from(files);
+    if (!all.length) return;
     processedPhotos.forEach(p => URL.revokeObjectURL(p.thumbUrl));
+
+    // Sequential, and downscaled for display. A whole shift's photos decoded
+    // in parallel at full resolution was the largest memory spike in the app;
+    // this is slower, so the count doubles as a progress line.
+    const countEl  = document.getElementById('photoCount');
+    const statusEl = document.getElementById('daysPhotoStatus');
+    const results  = [];
+    for (let i = 0; i < all.length; i++) {
+      const file    = all[i];
+      countEl.textContent = `Processing ${i + 1} of ${all.length}…`;
+      if (fillDays) statusEl.textContent = `Reading photo ${i + 1} of ${all.length}…`;
+      const stamp   = await getPhotoTimestamp(file);
+      const ts      = stamp.date;
+      const dateStr = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
+      results.push({ file, timestamp: ts, dateStr, slot: slotKey(ts), dayIdx: -1,
+                     timeSource: stamp.source,
+                     thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
+    }
+
+    // The days have to be filled before the photos are matched to them.
+    if (fillDays) statusEl.textContent = autofillDaysFromPhotos(results);
 
     const surveyDays = [];
     for (let i = 1; i <= 3; i++) {
       const dr = document.getElementById(`day${i}Date`).value;
       if (dr) surveyDays.push({ dateRaw: dr, label: `Day ${i}` });
     }
-
-    // Sequential, and downscaled for display. A whole shift's photos decoded
-    // in parallel at full resolution was the largest memory spike in the app;
-    // this is slower, so the count doubles as a progress line.
-    const countEl = document.getElementById('photoCount');
-    const all     = Array.from(files);
-    const results = [];
-    for (let i = 0; i < all.length; i++) {
-      const file    = all[i];
-      countEl.textContent = `Processing ${i + 1} of ${all.length}…`;
-      const stamp   = await getPhotoTimestamp(file);
-      const ts      = stamp.date;
-      const dateStr = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
-      const di      = surveyDays.findIndex(d => d.dateRaw === dateStr);
-      results.push({ file, timestamp: ts, dateStr, slot: slotKey(ts), dayIdx: di,
-                     timeSource: stamp.source,
-                     thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
-    }
+    results.forEach(p => { p.dayIdx = surveyDays.findIndex(d => d.dateRaw === p.dateStr); });
 
     processedPhotos = results.sort((a, b) => a.timestamp - b.timestamp);
     document.getElementById('photoCount').textContent =
@@ -2348,12 +2448,19 @@ Counts: ${t.countSummary(d)}`;
     try {
       if (!t.hourly) {
         const existing = d.notes;
+        // Count boxes still at 0 usually mean "not filled in yet", not "no
+        // birds". Passing them along made the model contradict the officer's
+        // own notes ("not much birds" became "did not see any birds"), so when
+        // every count is 0 the rough notes are the only source for numbers.
+        const allZero = t.counts.every(c => d.c[c.key] === '0');
+        const shiftForNotes = allZero ? shift.replace(/\nCounts: .*$/, '') : shift;
         const prompt = existing
-          ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.\n\nShift details:\n${shift}\n\nOfficer's rough notes to rephrase:\n${existing}`
+          ? `Rephrase these rough notes into finished first-person observation notes in the same voice as the examples. Keep ALL the details and context from the original — do not invent new facts and do not discard anything the officer wrote. Every place, person, food source and observation in your output must come from the rough notes or the shift details below.${allZero ? ' No bird counts were entered, so do not state any numbers that are not in the rough notes.' : ''}\n\nShift details:\n${shiftForNotes}\n\nOfficer's rough notes to rephrase:\n${existing}`
           : `Write my first-person observation notes for this surveillance shift.\n\n${shift}\n\n${t.notesBrief} Do not invent a location, block number, person or food source that is not in the details above — if you were not told it, leave it out.`;
         const el   = document.getElementById(`day${day}Notes`);
         const prev = el.value;
-        const text = await callClaude(system, prompt, btn);
+        let text = await callClaude(system, prompt, btn);
+        if (t.notesStrip) text = text.replace(t.notesStrip, '').replace(/^[ \t]+/gm, '').trim();
         el.value = text;
         rememberForUndo([{ id: el.id, prev }]);
         showToast('Notes rewritten.', UNDO_ACTION);
@@ -2405,50 +2512,6 @@ ${b.text}`;
         ? BLANK_LINE + `${rewritten} of ${toRewrite} blocks were rewritten before this failed and have been kept. The rest are still your original notes.`
         : '';
       alert('AI generation failed: ' + err.message + partial);
-    }
-  }
-
-  // ── Summary of Observations boxes ─────────────────────────────────────────
-  async function generateSection(field, btn) {
-    const t     = caseType();
-    const spec  = t.summaryFields.find(f => f.key === field);
-    if (!spec || !spec.ai) return;
-
-    const location = val('location') || 'the activation site';
-    const days     = collectDays();
-    if (!days.length) { alert('Please fill in at least Day 1 before generating.'); return; }
-
-    // Boxes flagged useNotes also see what the officer wrote for each day, so they
-    // can describe what actually happened rather than guessing from the counts.
-    const context = days.map((d, i) =>
-      `Day ${i + 1} (${d.date}, ${fmtTime(d.start)}–${fmtTime(d.end)}): ${t.countSummary(d)}` +
-      (spec.useNotes && d.notes ? `\nDay ${i + 1} observation notes written by the officer:\n${d.notes}` : '')
-    ).join('\n\n');
-
-    const brief = optVal('briefCustom');
-    const system = spec.examples
-      ? `You are an NParks Singapore field surveillance officer filling in the "${spec.formLabel}" row of an official government Occurrence Book report. Output plain text only — no titles, no headers, no bullets, no bold, no asterisks, no markdown, and do not output the example tags. Start directly with content.
-
-${spec.examples}
-
-CRITICAL: the examples come from other cases. Every place, block number, person and animal in them belongs to those reports, not this one. Never carry a detail from an example into your output — write only from the case details given below.`
-      : `You are an NParks Singapore field surveillance officer writing an official government Occurrence Book report. Output plain text only — no titles, no headers, no bold, no asterisks, no markdown. Start directly with content. 2–4 sentences.`;
-
-    const prompt = `Write the "${spec.formLabel}" entry for the surveillance at ${location}.
-${brief ? `\nCase-specific instruction from the activation brief: ${brief}\n` : ''}
-${context}
-
-${spec.brief} Use only what is above — do not invent a block number, food source, person or location that is not stated.`;
-
-    try {
-      const el   = document.getElementById(field);
-      const prev = el.value;
-      const text = await callClaude(system, prompt, btn);
-      el.value = text;
-      rememberForUndo([{ id: field, prev }]);
-      showToast('Rewritten.', UNDO_ACTION);
-    } catch (err) {
-      alert('AI generation failed: ' + err.message);
     }
   }
 
