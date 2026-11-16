@@ -800,12 +800,6 @@
   <!-- Card 3: Surveillance Days -->
   <div class="card">
     <div class="card-title"><span class="badge">3</span> Surveillance Days</div>
-    <div class="day-photo-wrap" style="margin-bottom:16px;">
-      <label class="btn-day-photo" for="photoInputDays">📷 Fill days from photos</label>
-      <input type="file" id="photoInputDays" multiple accept="image/*"
-        style="display:none" onchange="handlePhotoSelect(this.files, true)" />
-      <p class="hint" id="daysPhotoStatus" style="margin-top:8px;">Add all the surveillance photos here and the dates and shift times fill themselves. The same photos go into the report, so they do not need adding again in step 2.</p>
-    </div>
     <p class="hint" style="margin-bottom:16px;">Days 2 and 3 are optional — leave the date blank to skip them.</p>
 
     <div id="daysContainer"></div>
@@ -2239,61 +2233,7 @@ Return ONLY the JSON object.`;
     });
   }
 
-  // "15:32" style value for a time input, snapped to the nearest 15 minutes.
-  function roundTo15(date) {
-    const k = slotKey(date);
-    return `${k.slice(0, 2)}:${k.slice(2)}`;
-  }
-
-  // Photos first: the photos already know which days were worked and when each
-  // shift started and ended, so the Day 1 to 3 dates and times are read off
-  // them instead of typed. Each distinct date becomes a day, in order; the
-  // earliest photo of the date gives the start and the latest gives the end.
-  // Photos whose time is only the file date (see getPhotoTimestamp) are left
-  // out, since that is often when the file was copied. Returns a line saying
-  // what was done, which is shown under the button.
-  function autofillDaysFromPhotos(photos) {
-    const usable  = photos.filter(p => p.timeSource !== 'filemtime');
-    const skipped = photos.length - usable.length;
-    if (!usable.length) {
-      return 'None of these photos carry their own timestamp, so the dates and times could not be filled. Enter them by hand.';
-    }
-    const byDate = {};
-    usable.forEach(p => { (byDate[p.dateStr] = byDate[p.dateStr] || []).push(p.timestamp.getTime()); });
-    const dates = Object.keys(byDate).sort();
-    const used  = dates.slice(0, 3);
-
-    const hasDates = [1, 2, 3].some(n => optVal(`day${n}Date`));
-    if (hasDates && !confirm(
-      'Replace the dates and shift times already entered with the ones read from the photos?' +
-      BLANK_LINE + 'Notes and counts are not touched.')) {
-      return 'Dates and times left as they were.';
-    }
-
-    const parts = [];
-    for (let n = 1; n <= 3; n++) {
-      const ds = used[n - 1];
-      document.getElementById(`day${n}Date`).value = ds || '';
-      if (!ds) continue;
-      const start = roundTo15(new Date(Math.min(...byDate[ds])));
-      const end   = roundTo15(new Date(Math.max(...byDate[ds])));
-      document.getElementById(`day${n}Start`).value = start;
-      if (end === start) autoEndTime(n);              // one photo: assume the usual 3 hours
-      else document.getElementById(`day${n}End`).value = end;
-      renderNotes(n);                                 // hourly blocks follow the shift times
-      parts.push(`Day ${n}: ${fmtDateShort(ds)}, ${fmtTime(start)} to ${fmtTime(document.getElementById(`day${n}End`).value)}`);
-    }
-    scheduleDraftSave();
-
-    let msg = `Filled from ${usable.length} photo${usable.length !== 1 ? 's' : ''}. ${parts.join('. ')}. Check these before carrying on.`;
-    if (dates.length > 3) msg += ` The photos cover ${dates.length} dates, so only the first 3 were used.`;
-    if (skipped) msg += ` ${skipped} photo${skipped !== 1 ? 's have' : ' has'} no timestamp and ${skipped !== 1 ? 'were' : 'was'} not used for this.`;
-    return msg;
-  }
-
-  // fillDays is true when the photos were added from Card 3, before the days
-  // were typed. Either way this is the one photo set the report is built from.
-  async function handlePhotoSelect(files, fillDays) {
+  async function handlePhotoSelect(files) {
     const all = Array.from(files);
     if (!all.length) return;
     processedPhotos.forEach(p => URL.revokeObjectURL(p.thumbUrl));
@@ -2302,12 +2242,10 @@ Return ONLY the JSON object.`;
     // in parallel at full resolution was the largest memory spike in the app;
     // this is slower, so the count doubles as a progress line.
     const countEl  = document.getElementById('photoCount');
-    const statusEl = document.getElementById('daysPhotoStatus');
     const results  = [];
     for (let i = 0; i < all.length; i++) {
       const file    = all[i];
       countEl.textContent = `Processing ${i + 1} of ${all.length}…`;
-      if (fillDays) statusEl.textContent = `Reading photo ${i + 1} of ${all.length}…`;
       const stamp   = await getPhotoTimestamp(file);
       const ts      = stamp.date;
       const dateStr = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
@@ -2315,9 +2253,6 @@ Return ONLY the JSON object.`;
                      timeSource: stamp.source,
                      thumbUrl: (await downscale(file, THUMB_PX)) || URL.createObjectURL(file) });
     }
-
-    // The days have to be filled before the photos are matched to them.
-    if (fillDays) statusEl.textContent = autofillDaysFromPhotos(results);
 
     const surveyDays = [];
     for (let i = 1; i <= 3; i++) {

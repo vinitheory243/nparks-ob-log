@@ -268,44 +268,6 @@ ok('banner hidden after clearing', !$('draftBar').classList.contains('show'));
   const guess = await window.getPhotoTimestamp(bare);
   ok('a photo with no time at all is flagged', guess.source === 'filemtime', guess.source);
 
-  // photos first: dates and shift times are read off the photos
-  console.log('\n=== FILL DAYS FROM PHOTOS ===');
-  const ph = (y, mo, d, h, mi, source = 'exif') => {
-    const timestamp = new Date(y, mo - 1, d, h, mi, 0);
-    const dateStr = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    return { timestamp, dateStr, timeSource: source };
-  };
-  ['day1Date', 'day2Date', 'day3Date'].forEach(id => setv(id, ''));
-  let confirms = 0;
-  window.confirm = () => { confirms++; return true; };
-  const msg = window.autofillDaysFromPhotos([
-    ph(2026, 11, 13, 15, 29), ph(2026, 11, 13, 18, 31),      // day 2, given out of order
-    ph(2026, 11, 12, 15, 32), ph(2026, 11, 12, 16, 45), ph(2026, 11, 12, 18, 28),
-    ph(2026, 11, 15, 11, 40),                                 // day 3, a single photo
-    ph(2026, 11, 20, 9, 0, 'filemtime'),                      // no real timestamp
-  ]);
-  ok('empty days fill without asking', confirms === 0);
-  ok('day 1 is the earliest date', $('day1Date').value === '2026-11-12', $('day1Date').value);
-  ok('day 1 start snaps to 15 min', $('day1Start').value === '15:30', $('day1Start').value);
-  ok('day 1 end snaps to 15 min', $('day1End').value === '18:30', $('day1End').value);
-  ok('day 2 filled', $('day2Date').value === '2026-11-13' && $('day2Start').value === '15:30' && $('day2End').value === '18:30');
-  ok('single photo assumes a 3 hour shift', $('day3Start').value === '11:45' && $('day3End').value === '14:45',
-     $('day3Start').value + ' ' + $('day3End').value);
-  ok('guessed-time photo is not used as a day', !msg.includes('4 dates') && msg.includes('1 photo has no timestamp'), msg);
-
-  window.confirm = () => { confirms++; return false; };
-  window.autofillDaysFromPhotos([ph(2026, 12, 1, 9, 0), ph(2026, 12, 1, 12, 0)]);
-  ok('existing dates ask before replacing', confirms === 1);
-  ok('declining keeps the dates', $('day1Date').value === '2026-11-12' && $('day3Date').value === '2026-11-15');
-
-  window.confirm = () => true;
-  window.autofillDaysFromPhotos([ph(2026, 12, 1, 9, 0), ph(2026, 12, 1, 12, 0)]);
-  ok('replacing clears days the photos do not cover',
-     $('day1Date').value === '2026-12-01' && $('day2Date').value === '' && $('day3Date').value === '');
-
-  const none = window.autofillDaysFromPhotos([ph(2026, 12, 5, 9, 0, 'filemtime')]);
-  ok('photos with no timestamps change nothing', $('day1Date').value === '2026-12-01' && none.startsWith('None'));
-
   console.log(`\n${pass} passed, ${fail} failed\n`);
   process.exit(fail ? 1 : 0);
 })();
