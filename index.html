@@ -1711,7 +1711,7 @@ Fields to extract (only include fields clearly mentioned):
 - activationDate: YYYY-MM-DD
 - officerName: string (only one of ${Object.keys(OFFICERS).map(n => `"${n}"`).join(', ')} if recognisable)
 - days: array of objects, each: { date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM", ${dayKeys}, notes: string }
-${t.summaryFields.map(f => `- ${f.key}: string`).join('\n')}
+Do not return any other field. The Summary of Observations boxes are written by the officer, never filled from this text.
 
 Time parsing rules:
 - "1130" or "11:30am" or "11.30am" → "11:30"
@@ -1761,7 +1761,9 @@ Return ONLY the JSON object.`;
     setField('activationDate',    d.activationDate);
     if (d.activationType && t.showActivationType) document.getElementById('activationType').value = d.activationType;
     if (d.officerName)  { document.getElementById('officerName').value = d.officerName; fillOfficerHP(); }
-    t.summaryFields.forEach(f => setField(f.key, d[f.key]));
+    // Summary boxes are deliberately not filled here, even if the parser
+    // returns them: a pasted spreadsheet row was landing text in Animal
+    // Behaviour and Environment. They are the officer's to write.
 
     if (Array.isArray(d.days)) {
       d.days.slice(0, 3).forEach((day, i) => {
